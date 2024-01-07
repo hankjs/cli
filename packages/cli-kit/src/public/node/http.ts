@@ -7,14 +7,6 @@ import {outputContent, outputDebug} from '../../public/node/output.js'
 import {debugLogResponseInfo} from '../../private/node/api.js'
 import FormData from 'form-data'
 import nodeFetch, {RequestInfo, RequestInit} from 'node-fetch'
-import * as globalAgent from 'global-agent';
-
-const HTTP_PROXY = process.env.HTTP_PROXY;
-if (HTTP_PROXY) {
-  process.env["GLOBAL_AGENT_HTTP_PROXY"] = HTTP_PROXY
-  globalAgent.bootstrap();
-  outputDebug(outputContent`Using Proxy URL ${HTTP_PROXY}`)
-}
 
 export {FetchError} from 'node-fetch'
 
