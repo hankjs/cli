@@ -1,6 +1,6 @@
 {
   "name": "@hankts/shopify-theme",
-  "version": "3.53.1",
+  "version": "3.54.0",
   "private": false,
   "description": "Utilities for building and publishing themes",
   "homepage": "https://github.com/shopify/cli#readme",
@@ -34,10 +34,9 @@
   },
   "dependencies": {
     "@oclif/core": "3.15.1",
-    "@hankts/shopify-cli-kit": "3.53.0",
-    "@shopify/theme-check-node": "1.22.0",
-    "@shopify/theme-language-server-node": "1.7.1",
-    "global-agent": "^3.0.0",
+    "@hankts/shopify-cli-kit": "3.54.0",
+    "@shopify/theme-check-node": "2.0.0",
+    "@shopify/theme-language-server-node": "1.7.2",
     "yaml": "2.3.2"
   },
   "devDependencies": {

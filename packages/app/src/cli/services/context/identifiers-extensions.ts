@@ -6,9 +6,9 @@ import {createExtension} from '../dev/create-extension.js'
 import {IdentifiersExtensions} from '../../models/app/identifiers.js'
 import {getUIExtensionsToMigrate, migrateExtensionsToUIExtension} from '../dev/migrate-to-ui-extension.js'
 import {getFlowExtensionsToMigrate, migrateFlowExtensions} from '../dev/migrate-flow-extension.js'
+import {AppInterface} from '../../models/app/app.js'
 import {ensureAuthenticatedPartners} from '@shopify/cli-kit/node/session'
 import {outputCompleted} from '@shopify/cli-kit/node/output'
-import {useVersionedAppConfig} from '@shopify/cli-kit/node/context/local'
 import {AbortSilentError} from '@shopify/cli-kit/node/error'
 
 interface AppWithExtensions {
@@ -90,10 +90,11 @@ export async function deployConfirmed(
     extensionsToCreate: LocalSource[]
   },
 ) {
-  const extensionsNonUuidManaged = await ensureNonUuidManagedExtensionsIds(
+  const {extensionsNonUuidManaged, extensionsIdsNonUuidManaged} = await ensureNonUuidManagedExtensionsIds(
     configurationRegistrations,
-    options.app.allExtensions.filter((ext) => !ext.isUuidManaged()),
+    options.app,
     options.appId,
+    options.includeDraftExtensions,
   )
 
   const validMatchesById: {[key: string]: string} = {}
@@ -113,34 +114,40 @@ export async function deployConfirmed(
 
   return {
     extensions: validMatches,
-    extensionIds: validMatchesById,
+    extensionIds: {...validMatchesById, ...extensionsIdsNonUuidManaged},
     extensionsNonUuidManaged,
   }
 }
 
 async function ensureNonUuidManagedExtensionsIds(
   remoteConfigurationRegistrations: RemoteSource[],
-  localExtensionRegistrations: LocalSource[],
+  app: AppInterface,
   appId: string,
+  includeDraftExtensions = false,
 ) {
-  if (!useVersionedAppConfig()) return {}
+  let localExtensionRegistrations = includeDraftExtensions ? app.draftableExtensions : app.allExtensions
 
+  localExtensionRegistrations = localExtensionRegistrations.filter((ext) => !ext.isUuidManaged())
   const extensionsToCreate: LocalSource[] = []
   const validMatches: {[key: string]: string} = {}
+  const validMatchesById: {[key: string]: string} = {}
   localExtensionRegistrations.forEach((local) => {
     const possibleMatch = remoteConfigurationRegistrations.find((remote) => remote.type === local.graphQLType)
-    if (possibleMatch) validMatches[local.localIdentifier] = possibleMatch.uuid
-    else extensionsToCreate.push(local)
+    if (possibleMatch) {
+      validMatches[local.localIdentifier] = possibleMatch.uuid
+      validMatchesById[local.localIdentifier] = possibleMatch.id
+    } else extensionsToCreate.push(local)
   })
 
   if (extensionsToCreate.length > 0) {
     const newIdentifiers = await createExtensions(extensionsToCreate, appId, false)
     for (const [localIdentifier, registration] of Object.entries(newIdentifiers)) {
       validMatches[localIdentifier] = registration.uuid
+      validMatchesById[localIdentifier] = registration.id
     }
   }
 
-  return validMatches
+  return {extensionsNonUuidManaged: validMatches, extensionsIdsNonUuidManaged: validMatchesById}
 }
 
 async function createExtensions(extensions: LocalSource[], appId: string, output = true) {

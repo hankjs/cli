@@ -5,19 +5,6 @@
       ],
       "args": {
       },
-      "cli2Flags": [
-        "auto-correct",
-        "category",
-        "config",
-        "exclude-category",
-        "update-docs",
-        "fail-level",
-        "init",
-        "list",
-        "output",
-        "print",
-        "version"
-      ],
       "description": "Validate the theme.",
       "flags": {
         "auto-correct": {
@@ -29,16 +16,6 @@
           "required": false,
           "type": "boolean"
         },
-        "category": {
-          "char": "c",
-          "description": "Only run this category of checks\nRuns checks matching all categories when specified more than once",
-          "env": "SHOPIFY_FLAG_CATEGORY",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "name": "category",
-          "required": false,
-          "type": "option"
-        },
         "config": {
           "char": "C",
           "description": "Use the config provided, overriding .theme-check.yml if present\n      Supports all theme-check: config values, e.g., theme-check:theme-app-extension,\n      theme-check:recommended, theme-check:all\n      For backwards compatibility, :theme_app_extension is also supported ",
@@ -49,14 +26,6 @@
           "required": false,
           "type": "option"
         },
-        "dev-preview": {
-          "allowNo": false,
-          "description": "Use the dev preview version of theme check\nApplies the typescript implementation of theme check to the theme",
-          "env": "SHOPIFY_FLAG_DEV_PREVIEW",
-          "name": "dev-preview",
-          "required": false,
-          "type": "boolean"
-        },
         "environment": {
           "char": "e",
           "description": "The environment to apply to the current command.",
@@ -64,16 +33,6 @@
           "hasDynamicHelp": false,
           "multiple": false,
           "name": "environment",
-          "type": "option"
-        },
-        "exclude-category": {
-          "char": "x",
-          "description": "Exclude this category of checks\nExcludes checks matching any category when specified more than once",
-          "env": "SHOPIFY_FLAG_EXCLUDE_CATEGORY",
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "name": "exclude-category",
-          "required": false,
           "type": "option"
         },
         "fail-level": {
@@ -147,14 +106,6 @@
           "description": "Output active config to STDOUT",
           "env": "SHOPIFY_FLAG_PRINT",
           "name": "print",
-          "required": false,
-          "type": "boolean"
-        },
-        "update-docs": {
-          "allowNo": false,
-          "description": "Update Theme Check docs (objects, filters, and tags)",
-          "env": "SHOPIFY_FLAG_UPDATE_DOCS",
-          "name": "update-docs",
           "required": false,
           "type": "boolean"
         },
@@ -751,14 +702,6 @@
       },
       "description": "Start a Language Server Protocol server.",
       "flags": {
-        "dev-preview": {
-          "allowNo": false,
-          "description": "Use the dev preview version of theme check\nApplies the typescript implementation of theme check to the theme",
-          "env": "SHOPIFY_FLAG_DEV_PREVIEW",
-          "name": "dev-preview",
-          "required": false,
-          "type": "boolean"
-        },
         "no-color": {
           "allowNo": false,
           "description": "Disable color output.",
@@ -1147,6 +1090,14 @@
       ],
       "description": "Download your remote theme files locally.",
       "flags": {
+        "beta": {
+          "allowNo": false,
+          "description": "Performs the pull command by relying on the new download implementation.",
+          "env": "SHOPIFY_FLAG_BETA",
+          "hidden": true,
+          "name": "beta",
+          "type": "boolean"
+        },
         "development": {
           "allowNo": false,
           "char": "d",
@@ -1231,6 +1182,14 @@
           "name": "path",
           "noCacheDefault": true,
           "type": "option"
+        },
+        "stable": {
+          "allowNo": false,
+          "description": "Performs the pull command by relying on the legacy download implementation.",
+          "env": "SHOPIFY_FLAG_STABLE",
+          "hidden": true,
+          "name": "stable",
+          "type": "boolean"
         },
         "store": {
           "char": "s",
@@ -1464,6 +1423,108 @@
         "commands",
         "theme",
         "push.js"
+      ],
+      "strict": true
+    },
+    "theme:rename": {
+      "aliases": [
+      ],
+      "args": {
+      },
+      "description": "Renames an existing theme.",
+      "flags": {
+        "development": {
+          "allowNo": false,
+          "char": "d",
+          "description": "Rename your development theme.",
+          "env": "SHOPIFY_FLAG_DEVELOPMENT",
+          "name": "development",
+          "type": "boolean"
+        },
+        "environment": {
+          "char": "e",
+          "description": "The environment to apply to the current command.",
+          "env": "SHOPIFY_FLAG_ENVIRONMENT",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "name": "environment",
+          "type": "option"
+        },
+        "live": {
+          "allowNo": false,
+          "char": "l",
+          "description": "Rename your remote live theme.",
+          "env": "SHOPIFY_FLAG_LIVE",
+          "name": "live",
+          "type": "boolean"
+        },
+        "name": {
+          "char": "n",
+          "description": "The new name for the theme.",
+          "env": "SHOPIFY_FLAG_NEW_NAME",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "name": "name",
+          "required": true,
+          "type": "option"
+        },
+        "no-color": {
+          "allowNo": false,
+          "description": "Disable color output.",
+          "env": "SHOPIFY_FLAG_NO_COLOR",
+          "hidden": false,
+          "name": "no-color",
+          "type": "boolean"
+        },
+        "password": {
+          "description": "Password generated from the Theme Access app.",
+          "env": "SHOPIFY_CLI_THEME_TOKEN",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "name": "password",
+          "type": "option"
+        },
+        "store": {
+          "char": "s",
+          "description": "Store URL. It can be the store prefix (johns-apparel) or the full myshopify.com URL (johns-apparel.myshopify.com, https://johns-apparel.myshopify.com).",
+          "env": "SHOPIFY_FLAG_STORE",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "name": "store",
+          "type": "option"
+        },
+        "theme": {
+          "char": "t",
+          "description": "Theme ID or name of the remote theme.",
+          "env": "SHOPIFY_FLAG_THEME_ID",
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "name": "theme",
+          "type": "option"
+        },
+        "verbose": {
+          "allowNo": false,
+          "description": "Increase the verbosity of the logs.",
+          "env": "SHOPIFY_FLAG_VERBOSE",
+          "hidden": false,
+          "name": "verbose",
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [
+      ],
+      "id": "theme:rename",
+      "isESM": true,
+      "pluginAlias": "@shopify/theme",
+      "pluginName": "@shopify/theme",
+      "pluginType": "core",
+      "relativePath": [
+        "dist",
+        "cli",
+        "commands",
+        "theme",
+        "rename.js"
       ],
       "strict": true
     },
@@ -1758,5 +1819,5 @@
       "strict": true
     }
   },
-  "version": "3.53.0"
+  "version": "3.54.0"
 }
