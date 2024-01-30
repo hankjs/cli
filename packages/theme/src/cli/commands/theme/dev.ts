@@ -7,16 +7,6 @@ import {findOrSelectTheme} from '../../utilities/theme-selector.js'
 import {showEmbeddedCLIWarning} from '../../utilities/embedded-cli-warning.js'
 import {Flags} from '@oclif/core'
 import {globalFlags} from '@shopify/cli-kit/node/cli'
-import {outputDebug, outputContent} from '@shopify/cli-kit/node/output'
-
-import * as globalAgent from 'global-agent';
-
-const HTTP_PROXY = process.env.HTTP_PROXY;
-if (HTTP_PROXY) {
-  process.env["GLOBAL_AGENT_HTTP_PROXY"] = HTTP_PROXY
-  globalAgent.bootstrap();
-  outputDebug(outputContent`Using Proxy URL ${HTTP_PROXY}`)
-}
 
 export default class Dev extends ThemeCommand {
   static description =

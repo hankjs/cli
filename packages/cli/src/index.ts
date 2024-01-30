@@ -1,6 +1,9 @@
 import {runCLI, useLocalCLIIfDetected} from '@shopify/cli-kit/node/cli'
 // eslint-disable-next-line @shopify/cli/specific-imports-in-bootstrap-code
 import fs from 'fs'
+import {outputDebug, outputContent} from '@shopify/cli-kit/node/output'
+
+import * as globalAgent from 'global-agent';
 
 // In some cases (for example when we boot the proxy server), when an exception is
 // thrown, no 'exit' signal is sent to the process. We don't understand this fully.
@@ -31,6 +34,14 @@ interface RunShopifyCLIOptions {
 }
 
 async function runShopifyCLI({development}: RunShopifyCLIOptions) {
+  const HTTP_PROXY = process.env.HTTP_PROXY;
+
+  if (HTTP_PROXY) {
+    process.env["GLOBAL_AGENT_HTTP_PROXY"] = HTTP_PROXY;
+    globalAgent.bootstrap();
+    outputDebug(outputContent `Using Proxy URL ${HTTP_PROXY}`);
+  }
+
   if (!development) {
     // If we run a local CLI instead, don't run the global one again after!
     const ranLocalInstead = await useLocalCLIIfDetected(import.meta.url)
