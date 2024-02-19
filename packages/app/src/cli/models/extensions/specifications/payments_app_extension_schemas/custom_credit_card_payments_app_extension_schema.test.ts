@@ -28,6 +28,7 @@ const config: CustomCreditCardPaymentsAppExtensionConfigType = {
   api_version: '2022-07',
   checkout_payment_method_fields: [],
   checkout_hosted_fields: ['fields'],
+  ui_extension_handle: 'sample-ui-extension',
   description: 'Custom credit card extension',
   metafields: [],
   input: {
@@ -75,7 +76,6 @@ describe('customCreditCardPaymentsAppExtensionDeployConfig', () => {
 
     // Then
     expect(result).toMatchObject({
-      target: config.targeting[0]!.target,
       api_version: config.api_version,
       start_payment_session_url: config.payment_session_url,
       start_refund_session_url: config.refund_session_url,
@@ -91,6 +91,7 @@ describe('customCreditCardPaymentsAppExtensionDeployConfig', () => {
       multiple_capture: config.multiple_capture,
       checkout_payment_method_fields: config.checkout_payment_method_fields,
       checkout_hosted_fields: config.checkout_hosted_fields,
+      ui_extension_handle: config.ui_extension_handle,
     })
   })
 })

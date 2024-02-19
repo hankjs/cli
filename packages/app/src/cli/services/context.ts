@@ -17,7 +17,7 @@ import link from './app/config/link.js'
 import {writeAppConfigurationFile} from './app/write-app-configuration-file.js'
 import {PartnersSession, fetchPartnersSession} from './context/partner-account-info.js'
 import {fetchSpecifications} from './generate/fetch-extension-specifications.js'
-import {fetchAppRemoteBetaFlags} from './app/select-app.js'
+import {fetchAppRemoteConfiguration} from './app/select-app.js'
 import {reuseDevConfigPrompt, selectOrganizationPrompt} from '../prompts/dev.js'
 import {
   AppConfiguration,
@@ -53,7 +53,6 @@ import {AbortError} from '@shopify/cli-kit/node/error'
 import {outputContent} from '@shopify/cli-kit/node/output'
 import {getOrganization} from '@shopify/cli-kit/node/environment'
 import {basename, joinPath} from '@shopify/cli-kit/node/path'
-import {Config} from '@oclif/core'
 import {glob} from '@shopify/cli-kit/node/fs'
 import {partnersRequest} from '@shopify/cli-kit/node/api/partners'
 
@@ -69,7 +68,6 @@ export interface DevContextOptions {
   apiKey?: string
   storeFqdn?: string
   reset: boolean
-  commandConfig: Config
 }
 
 interface DevContextOutput {
@@ -96,7 +94,6 @@ export async function ensureGenerateContext(options: {
   directory: string
   reset: boolean
   partnersSession: PartnersSession
-  commandConfig: Config
   configName?: string
 }): Promise<string> {
   if (options.apiKey) {
@@ -201,15 +198,18 @@ export async function ensureDevContext(
   const specifications = await fetchSpecifications({
     token,
     apiKey: selectedApp.apiKey,
-    config: options.commandConfig,
   })
-  const betas = await fetchAppRemoteBetaFlags(selectedApp.apiKey, token)
+
+  selectedApp = {
+    ...selectedApp,
+    configuration: await fetchAppRemoteConfiguration(selectedApp.apiKey, token, specifications, selectedApp.betas),
+  }
 
   const localApp = await loadApp({
     directory: options.directory,
     specifications,
     configName: getAppConfigurationShorthand(configuration.path),
-    remoteBetas: betas,
+    remoteBetas: selectedApp.betas,
   })
 
   // We only update the cache or config if the current app is the right one
@@ -292,7 +292,6 @@ export interface ReleaseContextOptions {
   apiKey?: string
   reset: boolean
   force: boolean
-  commandConfig: Config
 }
 
 interface ReleaseContextOutput {
@@ -360,7 +359,6 @@ export interface DeployContextOptions {
   force: boolean
   noRelease: boolean
   commitReference?: string
-  commandConfig: Config
 }
 
 /**
@@ -377,19 +375,17 @@ export interface DeployContextOptions {
 export async function ensureDeployContext(options: DeployContextOptions): Promise<DeployContextOutput> {
   const partnersSession = await fetchPartnersSession()
   const token = partnersSession.token
-  const [partnersApp, envIdentifiers] = await fetchAppAndIdentifiers(options, partnersSession)
-  const betas = await fetchAppRemoteBetaFlags(partnersApp.apiKey, token)
+  const [partnersApp] = await fetchAppAndIdentifiers(options, partnersSession)
 
   const specifications = await fetchSpecifications({
     token,
     apiKey: partnersApp.apiKey,
-    config: options.commandConfig,
   })
   const app: AppInterface = await loadApp({
     specifications,
     directory: options.app.directory,
     configName: getAppConfigurationShorthand(options.app.configuration.path),
-    remoteBetas: betas,
+    remoteBetas: partnersApp.betas,
   })
 
   const org = await fetchOrgFromId(partnersApp.organizationId, partnersSession)
@@ -402,16 +398,14 @@ export async function ensureDeployContext(options: DeployContextOptions): Promis
     force: options.force,
   })
 
-  let identifiers: Identifiers = envIdentifiers as Identifiers
-
-  identifiers = await ensureDeploymentIdsPresence({
+  const identifiers = await ensureDeploymentIdsPresence({
     app,
     appId: partnersApp.apiKey,
     appName: partnersApp.title,
     force: options.force,
     release: !options.noRelease,
     token,
-    envIdentifiers,
+    envIdentifiers: getAppIdentifiers({app}),
     partnersApp,
   })
 
@@ -429,8 +423,7 @@ export async function ensureDeployContext(options: DeployContextOptions): Promis
       appType: partnersApp.appType,
       organizationId: partnersApp.organizationId,
       grantedScopes: partnersApp.grantedScopes,
-      applicationUrl: partnersApp.applicationUrl,
-      redirectUrlWhitelist: partnersApp.redirectUrlWhitelist,
+      betas: partnersApp.betas,
     },
     identifiers,
     token,
@@ -448,7 +441,6 @@ export interface DraftExtensionsPushOptions {
   directory: string
   apiKey?: string
   reset: boolean
-  commandConfig: Config
   config?: string
   enableDeveloperPreview: boolean
 }
@@ -457,7 +449,7 @@ export async function ensureDraftExtensionsPushContext(draftExtensionsPushOption
   const partnersSession = await fetchPartnersSession()
   const token = partnersSession.token
 
-  const specifications = await loadLocalExtensionsSpecifications(draftExtensionsPushOptions.commandConfig)
+  const specifications = await loadLocalExtensionsSpecifications()
 
   const app: AppInterface = await loadApp({
     specifications,
@@ -526,10 +518,10 @@ async function ensureIncludeConfigOnDeploy({
     appDotEnv: app.dotenv?.path,
     configFile: isCurrentAppSchema(app.configuration) ? basename(app.configuration.path) : undefined,
     resetMessage: resetHelpMessage,
-    includeConfigOnDeploy: app.useVersionedAppConfig ? previousIncludeConfigOnDeploy : undefined,
+    includeConfigOnDeploy: previousIncludeConfigOnDeploy,
   })
 
-  if (!app.useVersionedAppConfig || force || previousIncludeConfigOnDeploy !== undefined) return
+  if (force || previousIncludeConfigOnDeploy !== undefined) return
   await promptIncludeConfigOnDeploy({
     appDirectory: app.directory,
     localApp: app,
@@ -537,7 +529,7 @@ async function ensureIncludeConfigOnDeploy({
 }
 
 async function promptIncludeConfigOnDeploy(options: ShouldOrPromptIncludeConfigDeployOptions) {
-  const shouldIncludeConfigDeploy = await includeConfigOnDeployPrompt()
+  const shouldIncludeConfigDeploy = await includeConfigOnDeployPrompt(options.localApp.configuration.path)
   const localConfiguration = options.localApp.configuration as CurrentAppConfiguration
   localConfiguration.build = {
     ...localConfiguration.build,
@@ -549,9 +541,9 @@ async function promptIncludeConfigOnDeploy(options: ShouldOrPromptIncludeConfigD
   await metadata.addPublicMetadata(() => ({cmd_deploy_confirm_include_config_used: shouldIncludeConfigDeploy}))
 }
 
-function includeConfigOnDeployPrompt(): Promise<boolean> {
+function includeConfigOnDeployPrompt(configPath: string): Promise<boolean> {
   return renderConfirmationPrompt({
-    message: 'Include app configuration on `deploy`?',
+    message: `Include \`${basename(configPath)}\` configuration on \`deploy\`?`,
     confirmationMessage: 'Yes, always (Recommended)',
     cancellationMessage: 'No, never',
   })
@@ -594,7 +586,6 @@ interface VersionListContextOptions {
   app: AppInterface
   apiKey?: string
   reset: false
-  commandConfig: Config
 }
 
 interface VersionsListContextOutput {
@@ -651,7 +642,6 @@ export async function fetchAppAndIdentifiers(
     app: AppInterface
     reset: boolean
     apiKey?: string
-    commandConfig: Config
   },
   partnersSession: PartnersSession,
   reuseFromDev = true,
@@ -666,7 +656,7 @@ export async function fetchAppAndIdentifiers(
     envIdentifiers = {app: undefined, extensions: {}}
     reuseDevCache = false
     if (isCurrentAppSchema(app.configuration)) {
-      const configuration = await link({directory: app.directory, commandConfig: options.commandConfig})
+      const configuration = await link({directory: app.directory})
       app.configuration = configuration
     }
   }
@@ -774,14 +764,12 @@ export async function getAppContext({
   directory,
   partnersSession,
   configName,
-  commandConfig,
   promptLinkingApp = true,
 }: {
   reset: boolean
   directory: string
   partnersSession: PartnersSession
   configName?: string
-  commandConfig?: Config
   promptLinkingApp?: boolean
 }): Promise<AppContext> {
   const previousCachedInfo = getCachedAppInfo(directory)
@@ -793,8 +781,8 @@ export async function getAppContext({
   const usingConfigWithNoTomls =
     previousCachedInfo?.configFile && (await glob(joinPath(directory, 'shopify.app*.toml'))).length === 0
 
-  if (promptLinkingApp && commandConfig && (firstTimeSetup || usingConfigAndResetting || usingConfigWithNoTomls)) {
-    await link({directory, commandConfig, baseConfigName: previousCachedInfo?.configFile}, false)
+  if (promptLinkingApp && (firstTimeSetup || usingConfigAndResetting || usingConfigWithNoTomls)) {
+    await link({directory, baseConfigName: previousCachedInfo?.configFile}, false)
   }
 
   let cachedInfo = getCachedAppInfo(directory)

@@ -27,8 +27,6 @@ import link from './app/config/link.js'
 import {fetchPartnersSession} from './context/partner-account-info.js'
 import {fetchSpecifications} from './generate/fetch-extension-specifications.js'
 import * as writeAppConfigurationFile from './app/write-app-configuration-file.js'
-import {BetaFlag} from './app/select-app.js'
-import {loadFSExtensionsSpecifications} from '../models/extensions/load-specifications.js'
 import {Organization, OrganizationApp, OrganizationStore} from '../models/organization.js'
 import {updateAppIdentifiers, getAppIdentifiers} from '../models/app/identifiers.js'
 import {reuseDevConfigPrompt, selectOrganizationPrompt} from '../prompts/dev.js'
@@ -59,7 +57,6 @@ import {inTemporaryDirectory, readFile, writeFileSync} from '@shopify/cli-kit/no
 import {joinPath} from '@shopify/cli-kit/node/path'
 import {renderConfirmationPrompt, renderInfo, renderTasks, Task} from '@shopify/cli-kit/node/ui'
 import {Config} from '@oclif/core'
-import {setPathValue} from '@shopify/cli-kit/common/object'
 
 const COMMAND_CONFIG = {runHook: vi.fn(() => Promise.resolve({successes: []}))} as unknown as Config
 
@@ -109,7 +106,6 @@ const STORE2: OrganizationStore = {
 const INPUT: DevContextOptions = {
   directory: 'app_directory',
   reset: false,
-  commandConfig: COMMAND_CONFIG,
 }
 
 const INPUT_WITH_DATA: DevContextOptions = {
@@ -117,7 +113,6 @@ const INPUT_WITH_DATA: DevContextOptions = {
   reset: false,
   apiKey: 'key1',
   storeFqdn: 'domain1',
-  commandConfig: COMMAND_CONFIG,
 }
 
 const BAD_INPUT_WITH_DATA: DevContextOptions = {
@@ -125,7 +120,6 @@ const BAD_INPUT_WITH_DATA: DevContextOptions = {
   reset: false,
   apiKey: 'key1',
   storeFqdn: 'invalid_store_domain',
-  commandConfig: COMMAND_CONFIG,
 }
 
 const FETCH_RESPONSE = {
@@ -146,7 +140,6 @@ const options = (app: AppInterface, reset = false, force = false): DeployContext
     reset,
     force,
     noRelease: false,
-    commandConfig: COMMAND_CONFIG,
   }
 }
 
@@ -154,7 +147,6 @@ const draftExtensionsPushOptions = (app: AppInterface): DraftExtensionsPushOptio
   return {
     directory: app.directory,
     reset: false,
-    commandConfig: COMMAND_CONFIG,
     enableDeveloperPreview: false,
   }
 }
@@ -177,7 +169,7 @@ vi.mock('./generate/fetch-extension-specifications.js')
 vi.mock('./app/select-app.js')
 
 beforeAll(async () => {
-  vi.mocked(fetchSpecifications).mockResolvedValue(await loadFSExtensionsSpecifications())
+  vi.mocked(fetchSpecifications).mockResolvedValue(await loadSpecifications.loadLocalExtensionsSpecifications())
 })
 
 beforeEach(async () => {
@@ -417,7 +409,6 @@ describe('ensureDevContext', async () => {
         {
           directory: 'app_directory',
           reset: false,
-          commandConfig: COMMAND_CONFIG,
         },
         testPartnersUserSession,
       )
@@ -487,7 +478,6 @@ dev_store_url = "domain1"
         {
           directory: 'app_directory',
           reset: false,
-          commandConfig: COMMAND_CONFIG,
           apiKey: APP2.apiKey,
         },
         testPartnersUserSession,
@@ -545,7 +535,6 @@ dev_store_url = "domain1"
         {
           directory: 'app_directory',
           reset: false,
-          commandConfig: COMMAND_CONFIG,
         },
         testPartnersUserSession,
       )
@@ -585,7 +574,6 @@ dev_store_url = "domain1"
         {
           directory: 'app_directory',
           reset: false,
-          commandConfig: COMMAND_CONFIG,
         },
         testPartnersUserSession,
       )
@@ -643,7 +631,6 @@ api_version = "2023-04"
         {
           directory: 'app_directory',
           reset: false,
-          commandConfig: COMMAND_CONFIG,
         },
         testPartnersUserSession,
       )
@@ -840,7 +827,7 @@ api_version = "2023-04"
           path: filePath,
           client_id: APP2.apiKey,
           name: APP2.apiKey,
-          application_url: APP2.applicationUrl,
+          application_url: 'https://example.com',
           webhooks: {api_version: '2023-04'},
           embedded: true,
         } as CurrentAppConfiguration,
@@ -887,7 +874,7 @@ api_version = "2023-04"
           path: filePath,
           client_id: APP2.apiKey,
           name: APP2.apiKey,
-          application_url: APP2.applicationUrl,
+          application_url: 'https://example.com',
           webhooks: {api_version: '2023-04'},
           embedded: true,
         } as CurrentAppConfiguration,
@@ -1129,10 +1116,9 @@ describe('ensureDeployContext', () => {
 
     expect(metadata.getAllPublicMetadata()).toMatchObject({api_key: APP2.apiKey, partner_id: 1})
   })
-  test('prompts the user to include the configuration and persist the flag if the flag is not present and the beta is enabled', async () => {
+  test('prompts the user to include the configuration and persist the flag if the flag is not present', async () => {
     // Given
     const app = testAppWithConfig({config: {client_id: APP2.apiKey}})
-    setPathValue(app, 'remoteBetaFlags', [BetaFlag.VersionedAppConfig])
     const identifiers = {
       app: APP2.apiKey,
       extensions: {},
@@ -1180,10 +1166,9 @@ describe('ensureDeployContext', () => {
     })
     writeAppConfigurationFileSpy.mockRestore()
   })
-  test('prompts the user to include the configuration and set it to false when not confirmed if the flag is not present and the beta is enabled', async () => {
+  test('prompts the user to include the configuration and set it to false when not confirmed if the flag is not present', async () => {
     // Given
     const app = testAppWithConfig({config: {client_id: APP2.apiKey}})
-    setPathValue(app, 'remoteBetaFlags', [BetaFlag.VersionedAppConfig])
     const identifiers = {
       app: APP2.apiKey,
       extensions: {},
@@ -1227,10 +1212,9 @@ describe('ensureDeployContext', () => {
     })
     writeAppConfigurationFileSpy.mockRestore()
   })
-  test('doesnt prompt the user to include the configuration and display the current value if the flag and beta are enabled', async () => {
+  test('doesnt prompt the user to include the configuration and display the current value if the flag', async () => {
     // Given
     const app = testAppWithConfig({config: {client_id: APP2.apiKey, build: {include_config_on_deploy: true}}})
-    setPathValue(app, 'remoteBetaFlags', [BetaFlag.VersionedAppConfig])
     const identifiers = {
       app: APP2.apiKey,
       extensions: {},
@@ -1276,10 +1260,9 @@ describe('ensureDeployContext', () => {
     })
     writeAppConfigurationFileSpy.mockRestore()
   })
-  test('prompts the user to include the configuration when reset is used if the flag and beta are enabled', async () => {
+  test('prompts the user to include the configuration when reset is used if the flag', async () => {
     // Given
     const app = testAppWithConfig({config: {client_id: APP2.apiKey, build: {include_config_on_deploy: true}}})
-    setPathValue(app, 'remoteBetaFlags', [BetaFlag.VersionedAppConfig])
     const identifiers = {
       app: APP2.apiKey,
       extensions: {},
@@ -1328,10 +1311,9 @@ describe('ensureDeployContext', () => {
     })
     writeAppConfigurationFileSpy.mockRestore()
   })
-  test('doesnt prompt the user to include the configuration when force is used if the flag is not present and beta are enabled', async () => {
+  test('doesnt prompt the user to include the configuration when force is used if the flag is not present', async () => {
     // Given
     const app = testAppWithConfig({config: {client_id: APP2.apiKey}})
-    setPathValue(app, 'remoteBetaFlags', [BetaFlag.VersionedAppConfig])
     const identifiers = {
       app: APP2.apiKey,
       extensions: {},
@@ -1372,10 +1354,9 @@ describe('ensureDeployContext', () => {
     })
     writeAppConfigurationFileSpy.mockRestore()
   })
-  test('prompt the user to include the configuration when force is used  if the flag and beta are enabled', async () => {
+  test('prompt the user to include the configuration when force is used  if the flag', async () => {
     // Given
     const app = testAppWithConfig({config: {client_id: APP2.apiKey, build: {include_config_on_deploy: true}}})
-    setPathValue(app, 'remoteBetaFlags', [BetaFlag.VersionedAppConfig])
     const identifiers = {
       app: APP2.apiKey,
       extensions: {},
@@ -1416,50 +1397,6 @@ describe('ensureDeployContext', () => {
     })
     writeAppConfigurationFileSpy.mockRestore()
   })
-  test('doesnt prompt the user to include the configuration regardless the value of the flag is the beta is not enabled', async () => {
-    // Given
-    const app = testAppWithConfig({config: {client_id: APP2.apiKey}})
-    const identifiers = {
-      app: APP2.apiKey,
-      extensions: {},
-      extensionIds: {},
-      extensionsNonUuidManaged: {},
-    }
-    vi.mocked(getAppIdentifiers).mockReturnValue({app: undefined})
-    vi.mocked(fetchAppDetailsFromApiKey).mockResolvedValueOnce(APP2)
-    vi.mocked(ensureDeploymentIdsPresence).mockResolvedValue(identifiers)
-    vi.mocked(loadApp).mockResolvedValue(app)
-    vi.mocked(renderConfirmationPrompt).mockResolvedValue(false)
-    vi.mocked(getAppConfigurationFileName).mockReturnValue('shopify.app.toml')
-    const writeAppConfigurationFileSpy = vi
-      .spyOn(writeAppConfigurationFile, 'writeAppConfigurationFile')
-      .mockResolvedValue()
-
-    // When
-    await ensureDeployContext(options(app, false, true))
-
-    // Then
-    // Then
-    expect(renderConfirmationPrompt).not.toHaveBeenCalled()
-    expect(writeAppConfigurationFileSpy).not.toHaveBeenCalled()
-    expect(renderInfo).toHaveBeenCalledWith({
-      body: [
-        {
-          list: {
-            items: ['Org:             org1', 'App:             app2'],
-          },
-        },
-        '\n',
-        'You can pass',
-        {
-          command: '--reset',
-        },
-        'to your command to reset your app configuration.',
-      ],
-      headline: 'Using shopify.app.toml:',
-    })
-    writeAppConfigurationFileSpy.mockRestore()
-  })
 })
 
 describe('ensureDraftExtensionsPushContext', () => {
@@ -1473,7 +1410,6 @@ describe('ensureDraftExtensionsPushContext', () => {
       extensionsNonUuidManaged: {},
     }
 
-    vi.spyOn(loadSpecifications, 'loadLocalExtensionsSpecifications').mockResolvedValue([])
     vi.mocked(loadApp).mockResolvedValue(app)
     vi.mocked(getAppIdentifiers).mockReturnValueOnce({app: APP2.apiKey})
     vi.mocked(fetchAppDetailsFromApiKey).mockResolvedValueOnce(APP2)
@@ -1501,7 +1437,7 @@ describe('ensureDraftExtensionsPushContext', () => {
       extensionIds: {},
       extensionsNonUuidManaged: {},
     }
-    vi.spyOn(loadSpecifications, 'loadLocalExtensionsSpecifications').mockResolvedValue([])
+
     vi.mocked(loadApp).mockResolvedValue(app)
     vi.mocked(getAppIdentifiers).mockReturnValue({app: undefined})
     vi.mocked(getCachedAppInfo).mockReturnValue(CACHED1)
@@ -1530,7 +1466,7 @@ describe('ensureDraftExtensionsPushContext', () => {
       extensionIds: {},
       extensionsNonUuidManaged: {},
     }
-    vi.spyOn(loadSpecifications, 'loadLocalExtensionsSpecifications').mockResolvedValue([])
+
     vi.mocked(loadApp).mockResolvedValue(app)
     vi.mocked(getAppIdentifiers).mockReturnValue({app: undefined})
     vi.mocked(fetchAppDetailsFromApiKey).mockResolvedValueOnce(APP2)
@@ -1558,7 +1494,7 @@ describe('ensureDraftExtensionsPushContext', () => {
       extensionIds: {},
       extensionsNonUuidManaged: {},
     }
-    vi.spyOn(loadSpecifications, 'loadLocalExtensionsSpecifications').mockResolvedValue([])
+
     vi.mocked(loadApp).mockResolvedValue(app)
     vi.mocked(getAppIdentifiers).mockReturnValue({app: undefined})
     vi.mocked(fetchAppDetailsFromApiKey).mockResolvedValueOnce(APP2)
@@ -1583,7 +1519,7 @@ describe('ensureDraftExtensionsPushContext', () => {
   test("throws an app not found error if the app with the Client ID doesn't exist", async () => {
     // Given
     const app = testApp()
-    vi.spyOn(loadSpecifications, 'loadLocalExtensionsSpecifications').mockResolvedValue([])
+
     vi.mocked(loadApp).mockResolvedValue(app)
     vi.mocked(getAppIdentifiers).mockReturnValue({app: APP1.apiKey})
     vi.mocked(fetchAppDetailsFromApiKey).mockResolvedValueOnce(undefined)
@@ -1604,7 +1540,6 @@ describe('ensureDraftExtensionsPushContext', () => {
       extensionsNonUuidManaged: {},
     }
 
-    vi.spyOn(loadSpecifications, 'loadLocalExtensionsSpecifications').mockResolvedValue([])
     vi.mocked(loadApp).mockResolvedValue(app)
     // There is a cached app but it will be ignored
     vi.mocked(getAppIdentifiers).mockReturnValue({app: APP2.apiKey})
@@ -1647,7 +1582,6 @@ describe('ensureReleaseContext', () => {
       apiKey: 'key2',
       reset: false,
       force: false,
-      commandConfig: COMMAND_CONFIG,
     })
 
     // Then
@@ -1741,7 +1675,6 @@ describe('ensureVersionsListContext', () => {
       app,
       apiKey: 'key1',
       reset: false,
-      commandConfig: COMMAND_CONFIG,
     })
 
     // Then

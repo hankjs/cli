@@ -1,5 +1,41 @@
 # @shopify/app
 
+## 3.56.0
+
+### Minor Changes
+
+- 390729c33: `app config push` and `app update-url` commands dropped
+
+### Patch Changes
+
+- 36f900124: Remover versiond app config beta
+- ea4983751: Remove api client configuration from the link command
+- c3c9fbc12: Link command uses current version app configuration modules instead extensions registrations
+- a73bfbde1: Remove GetConfig query
+- e7ba7f4cd: Refine scope parsing format
+- 78fb46806: Add support for "query" query param in graphiql
+- f3210b895: Link overwrites redirect urls
+- 6732bca77: Display empty sections inside the deploy release prompt
+- Updated dependencies [1220290ec]
+  - @shopify/cli-kit@3.56.0
+  - @shopify/plugin-cloudflare@3.56.0
+
+## 3.55.0
+
+### Minor Changes
+
+- c5faed951: - Deploy command will push the configuration to the server
+  - Added the new flag `update_config_on_deploy` to the toml to opt-in/opt-out deploying the configuration with the deploy command
+  - Deploy and release prompts will display the differences between the local and the remote app configuration
+  - Deploy and release prompts will display if the dashboard managed extensions are new or deleted for the new version
+  - Added support to configure the `Direct API offline access` in the `toml`
+  - Configuration will be pushed automatically to the draft version when you run the `dev` command
+
+### Patch Changes
+
+- @shopify/cli-kit@3.55.0
+- @shopify/plugin-cloudflare@3.55.0
+
 ## 3.54.0
 
 ### Minor Changes

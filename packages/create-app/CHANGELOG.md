@@ -1,5 +1,18 @@
 # @shopify/create-app
 
+## 3.56.0
+
+### Patch Changes
+
+- Updated dependencies [1220290ec]
+  - @shopify/cli-kit@3.56.0
+
+## 3.55.0
+
+### Patch Changes
+
+- @shopify/cli-kit@3.55.0
+
 ## 3.54.0
 
 ### Minor Changes

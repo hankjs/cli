@@ -19,6 +19,7 @@ export const CustomOnsitePaymentsAppExtensionSchema = BasePaymentsAppExtensionSc
     multiple_capture: zod.boolean().optional(),
     supports_oversell_protection: zod.boolean().optional(),
     modal_payment_method_fields: zod.array(zod.object({})).optional(),
+    ui_extension_handle: zod.string().optional(),
     checkout_payment_method_fields: zod
       .array(
         zod.object({
@@ -37,7 +38,6 @@ export async function customOnsitePaymentsAppExtensionDeployConfig(
   config: CustomOnsitePaymentsAppExtensionConfigType,
 ): Promise<{[key: string]: unknown} | undefined> {
   return {
-    target: config.targeting[0]!.target,
     api_version: config.api_version,
     start_payment_session_url: config.payment_session_url,
     start_refund_session_url: config.refund_session_url,
@@ -58,5 +58,6 @@ export async function customOnsitePaymentsAppExtensionDeployConfig(
     buyer_label_to_locale: config.buyer_label_translations,
     checkout_payment_method_fields: config.checkout_payment_method_fields,
     modal_payment_method_fields: config.modal_payment_method_fields,
+    ui_extension_handle: config.ui_extension_handle,
   }
 }
