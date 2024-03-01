@@ -5,18 +5,27 @@ import themeExtension from '../templates/theme-specifications/theme.js'
 import {ExtensionInstance} from '../extensions/extension-instance.js'
 import {loadLocalExtensionsSpecifications} from '../extensions/load-specifications.js'
 import {FunctionConfigType} from '../extensions/specifications/function.js'
-import {OrganizationApp} from '../organization.js'
+import {Organization, OrganizationApp} from '../organization.js'
 import productSubscriptionUIExtension from '../templates/ui-specifications/product_subscription.js'
 import webPixelUIExtension from '../templates/ui-specifications/web_pixel_extension.js'
 import {BaseConfigType} from '../extensions/schemas.js'
 import {PartnersSession} from '../../services/context/partner-account-info.js'
 import {WebhooksConfig} from '../extensions/specifications/types/app_config_webhook.js'
 import {PaymentsAppExtensionConfigType} from '../extensions/specifications/payments_app_extension.js'
+import {CreateAppOptions, DeveloperPlatformClient} from '../../utilities/developer-platform-client.js'
+import {ActiveAppVersionQuerySchema} from '../../api/graphql/app_active_version.js'
+import {AllAppExtensionRegistrationsQuerySchema} from '../../api/graphql/all_app_extension_registrations.js'
+import {ExtensionUpdateDraftInput, ExtensionUpdateSchema} from '../../api/graphql/update_draft.js'
+import {AppDeploySchema, AppDeployVariables} from '../../api/graphql/app_deploy.js'
+import {
+  GenerateSignedUploadUrlSchema,
+  GenerateSignedUploadUrlVariables,
+} from '../../api/graphql/generate_signed_upload_url.js'
 
 export const DEFAULT_CONFIG = {
   path: '/tmp/project/shopify.app.toml',
   application_url: 'https://myapp.com',
-  client_id: '12345',
+  client_id: 'api-key',
   name: 'my app',
   webhooks: {
     api_version: '2023-04',
@@ -102,6 +111,14 @@ export function getWebhookConfig(webhookConfigOverrides?: WebhooksConfig) {
       ...DEFAULT_CONFIG.webhooks,
       ...webhookConfigOverrides,
     },
+  }
+}
+
+export function testOrganization(): Organization {
+  return {
+    id: '1',
+    businessName: 'org1',
+    website: 'https://www.example.com',
   }
 }
 
@@ -639,6 +656,89 @@ export const testPartnersUserSession: PartnersSession = {
     type: 'UserAccount',
     email: 'partner@shopify.com',
   },
+}
+
+const emptyAppExtensionRegistrations: AllAppExtensionRegistrationsQuerySchema = {
+  app: {
+    extensionRegistrations: [],
+    configurationRegistrations: [],
+    dashboardManagedExtensionRegistrations: [],
+  },
+}
+
+const emptyAppVersion: ActiveAppVersionQuerySchema = {
+  app: {
+    activeAppVersion: {
+      appModuleVersions: [],
+    },
+  },
+}
+
+const functionUploadUrlResponse = {
+  functionUploadUrlGenerate: {
+    generatedUrlDetails: {
+      headers: {},
+      maxSize: '200 kb',
+      url: 'https://example.com/upload-url',
+      moduleId: 'module-id',
+      maxBytes: 200,
+    },
+  },
+}
+
+const extensionUpdateResponse: ExtensionUpdateSchema = {
+  extensionUpdateDraft: {
+    clientMutationId: 'client-mutation-id',
+    userErrors: [],
+  },
+}
+
+const deployResponse: AppDeploySchema = {
+  appDeploy: {
+    appVersion: {
+      uuid: 'uuid',
+      id: 1,
+      versionTag: 'version-tag',
+      location: 'location',
+      message: 'message',
+      appModuleVersions: [],
+    },
+    userErrors: [],
+  },
+}
+
+const generateSignedUploadUrlResponse: GenerateSignedUploadUrlSchema = {
+  appVersionGenerateSignedUploadUrl: {
+    signedUploadUrl: 'signed-upload-url',
+    userErrors: [],
+  },
+}
+
+export function testDeveloperPlatformClient(stubs: Partial<DeveloperPlatformClient> = {}): DeveloperPlatformClient {
+  return {
+    session: () => Promise.resolve(testPartnersUserSession),
+    refreshToken: () => Promise.resolve(testPartnersUserSession.token),
+    accountInfo: () => Promise.resolve(testPartnersUserSession.accountInfo),
+    appFromId: (_clientId: string) => Promise.resolve(testOrganizationApp()),
+    organizations: () => Promise.resolve([testOrganization()]),
+    orgFromId: (_organizationId: string) => Promise.resolve(testOrganization()),
+    appsForOrg: (_organizationId: string) => Promise.resolve({apps: [testOrganizationApp()], hasMorePages: false}),
+    selectOrg: () => Promise.resolve(testOrganization()),
+    specifications: (_appId: string) => Promise.resolve([]),
+    orgAndApps: (_orgId: string) =>
+      Promise.resolve({organization: testOrganization(), apps: [testOrganizationApp()], hasMorePages: false}),
+    createApp: (_organization: Organization, _name: string, _options?: CreateAppOptions) =>
+      Promise.resolve(testOrganizationApp()),
+    devStoresForOrg: (_organizationId: string) => Promise.resolve([]),
+    appExtensionRegistrations: (_appId: string) => Promise.resolve(emptyAppExtensionRegistrations),
+    activeAppVersion: (_appId: string) => Promise.resolve(emptyAppVersion),
+    functionUploadUrl: () => Promise.resolve(functionUploadUrlResponse),
+    updateExtension: (input: ExtensionUpdateDraftInput) => Promise.resolve(extensionUpdateResponse),
+    deploy: (input: AppDeployVariables) => Promise.resolve(deployResponse),
+    generateSignedUploadUrl: (input: GenerateSignedUploadUrlVariables) =>
+      Promise.resolve(generateSignedUploadUrlResponse),
+    ...stubs,
+  }
 }
 
 export const testPartnersServiceSession: PartnersSession = {

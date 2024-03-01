@@ -208,9 +208,6 @@ importers:
       ink:
         specifier: 4.4.1
         version: 4.4.1(@types/react@17.0.2)(react@18.2.0)
-      javy-cli:
-        specifier: 0.1.8
-        version: 0.1.8
       micromatch:
         specifier: 4.0.5
         version: 4.0.5
@@ -708,12 +705,6 @@ importers:
       '@shopify/cli-kit':
         specifier: 3.56.0
         version: link:../cli-kit
-      node-fetch:
-        specifier: 3.3.2
-        version: 3.3.2
-      semver:
-        specifier: 7.5.4
-        version: 7.5.4
     devDependencies:
       vite:
         specifier: 4.4.9
@@ -4971,10 +4962,6 @@ packages:
       '@types/node': 18.19.3
     dev: true
 
-  /@types/git-diff@2.0.3:
-    resolution: {integrity: sha512-PWQ+uy67HhZG9iJYkH7ReC9ymVbkp7FHXjskA1HrQGQifSPYkFdHBYCpJgI6lWENHFnvssk7uGJ5q/tqUOnEKw==}
-    dev: true
-
   /@types/glob@8.1.0:
     resolution: {integrity: sha512-IO+MJPVhoqz+28h1qLAcBEH2+xHMK6MTyHJc7MTnnYb6wsoLR29POVGJ7LycmVXIqyy/4/2ShP5sUwTXuOwb/w==}
     dependencies:
@@ -7384,6 +7371,7 @@ packages:
   /diff@3.5.0:
     resolution: {integrity: sha512-A46qtFgd+g7pDZinpnwiRJtxbC1hpgf0uzP3iG89scHk0AUC7A1TGxf5OiiOUv/JMZR8GOt8hL900hV0bOy5xA==}
     engines: {node: '>=0.3.1'}
+    dev: true
 
   /diff@4.0.2:
     resolution: {integrity: sha512-58lmxKSA4BNyLz+HHMUzlOEpg09FV+ev6ZMe3vJihgdxzgcwZ8VoEEPmALCZG9LmqfVoNMMKpttIYTVG6uDY7A==}
@@ -8752,6 +8740,7 @@ packages:
       loglevel: 1.8.1
       shelljs: 0.8.5
       shelljs.exec: 1.1.8
+    dev: true
 
   /github-slugger@1.5.0:
     resolution: {integrity: sha512-wIh+gKBI9Nshz2o46B0B3f5k/W+WI9ZAv6y5Dn5WJ5SK1t0TnDimB4WE5rmTD05ZAIn8HALCZVmCsvj0w0v0lw==}
@@ -9738,14 +9727,6 @@ packages:
       filelist: 1.0.4
       minimatch: 3.1.2
 
-  /javy-cli@0.1.8:
-    resolution: {integrity: sha512-6CEmAB9/NtdbUh33u5tww9RTiJ/CqqH7+iPgKb5FprIm9NOwaETVIAuN9gDN3zXZb9ePb/wVQw73icBY9EuFOg==}
-    hasBin: true
-    dependencies:
-      cachedir: 2.3.0
-      node-fetch: 3.3.1
-    dev: false
-
   /jest-diff@26.6.2:
     resolution: {integrity: sha512-6m+9Z3Gv9wN0WFVasqjCL/06+EFCMTqDEUl/b87HYK2rAPTyfz4ZIuSlPhY51PIQRWx5TaxeF1qmXKe9gfN3sA==}
     engines: {node: '>= 10.14.2'}
@@ -10189,6 +10170,7 @@ packages:
   /loglevel@1.8.1:
     resolution: {integrity: sha512-tCRIJM51SHjAayKwC+QAg8hT8vg6z7GSgLJKGvzuPb1Wc+hLzqtuVLxp6/HzSPOozuK+8ErAhy7U/sVzw8Dgfg==}
     engines: {node: '>= 0.6.0'}
+    dev: true
 
   /loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
@@ -12836,6 +12818,7 @@ packages:
   /shelljs.exec@1.1.8:
     resolution: {integrity: sha512-vFILCw+lzUtiwBAHV8/Ex8JsFjelFMdhONIsgKNLgTzeRckp2AOYRQtHJE/9LhNvdMmE27AGtzWx0+DHpwIwSw==}
     engines: {node: '>= 4.0.0'}
+    dev: true
 
   /shelljs@0.8.5:
     resolution: {integrity: sha512-TiwcRcrkhHvbrZbnRcFYMLl30Dfov3HKqzp5tO5b4pt6G/SezKcYhmDg15zXVBswHmctSAQKznqNW2LO5tTDow==}

@@ -18,7 +18,7 @@ const AppAccessSchema = zod.object({
     .object({
       scopes: zod
         .string()
-        .transform((scopes) => normalizeDelimitedString(scopes))
+        .transform((scopes) => normalizeDelimitedString(scopes) ?? '')
         .optional(),
       use_legacy_install_flow: zod.boolean().optional(),
     })
@@ -37,10 +37,10 @@ const AppAccessTransformConfig: TransformationConfig = {
   redirect_url_allowlist: 'auth.redirect_urls',
 }
 
-const spec = createConfigExtensionSpecification({
+const appAccessSpec = createConfigExtensionSpecification({
   identifier: AppAccessSpecIdentifier,
   schema: AppAccessSchema,
   transformConfig: AppAccessTransformConfig,
 })
 
-export default spec
+export default appAccessSpec
