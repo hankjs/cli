@@ -40,7 +40,7 @@ Then(
   async function (extName: string, extType: string, flavor: string) {
     const appInfo: AppInfo = await this.appInfo()
     const extension = this.findExtension(appInfo, extName)
-    if (!extension) assert.fail(`Extension not created! Config:\n${JSON.stringify(appInfo, null, 2)}`)
+    if (!extension) assert.fail(`Extension not created! Config:\n${JSON.stringify(appInfo.allExtensions, null, 2)}`)
     assert.equal(extension.configuration.type, extType)
 
     let fileExtension
@@ -73,7 +73,7 @@ Then(/I have an extension named (.+) of type ([^\s]+)$/, {}, async function (ext
   assert.equal(extension.configuration.type, extType)
 })
 
-Then(/I do not have an extension named (.+) of type ([^\s]+)/, {}, async function (extName: string, extType: string) {
+Then(/I do not have an extension named (.+) of type ([^\s]+)/, {}, async function (extName: string, _extType: string) {
   const appInfo: AppInfo = await this.appInfo()
   const extension = this.findExtension(appInfo, extName)
   assert.equal(extension, undefined)

@@ -1,7 +1,6 @@
 import {ensureDeployContext} from './context.js'
 import {deploy} from './deploy.js'
 import {uploadWasmBlob, uploadExtensionsBundle} from './deploy/upload.js'
-import {fetchAppExtensionRegistrations} from './dev/fetch.js'
 import {bundleAndBuildExtensions} from './deploy/bundle.js'
 import {
   testApp,
@@ -60,12 +59,13 @@ describe('deploy', () => {
     // When
     await testDeployBundle({
       app,
-      partnersApp: {
+      remoteApp: {
         id: 'app-id',
+        apiKey: 'api-key',
         organizationId: 'org-id',
         title: 'app-title',
         grantedScopes: [],
-        betas: [],
+        flags: [],
       },
       options: {
         noRelease: false,
@@ -76,6 +76,7 @@ describe('deploy', () => {
     // Then
     expect(uploadExtensionsBundle).toHaveBeenCalledWith({
       apiKey: 'app-id',
+      organizationId: 'org-id',
       appModules: [],
       developerPlatformClient,
       extensionIds: {},
@@ -90,12 +91,13 @@ describe('deploy', () => {
     // When
     await testDeployBundle({
       app,
-      partnersApp: {
+      remoteApp: {
         id: 'app-id',
+        apiKey: 'api-key',
         organizationId: 'org-id',
         title: 'app-title',
         grantedScopes: [],
-        betas: [],
+        flags: [],
       },
       options: {
         message: 'Deployed from CLI with flag',
@@ -118,12 +120,13 @@ describe('deploy', () => {
     // When
     await testDeployBundle({
       app,
-      partnersApp: {
+      remoteApp: {
         id: 'app-id',
+        apiKey: 'api-key',
         organizationId: 'org-id',
         title: 'app-title',
         grantedScopes: [],
-        betas: [],
+        flags: [],
       },
       options: {
         version: '1.1.0',
@@ -146,12 +149,13 @@ describe('deploy', () => {
     // When
     await testDeployBundle({
       app,
-      partnersApp: {
+      remoteApp: {
         id: 'app-id',
+        apiKey: 'api-key',
         organizationId: 'org-id',
         title: 'app-title',
         grantedScopes: [],
-        betas: [],
+        flags: [],
       },
       developerPlatformClient,
     })
@@ -159,6 +163,7 @@ describe('deploy', () => {
     // Then
     expect(uploadExtensionsBundle).toHaveBeenCalledWith({
       apiKey: 'app-id',
+      organizationId: 'org-id',
       appModules: [],
       developerPlatformClient,
       extensionIds: {},
@@ -179,6 +184,7 @@ describe('deploy', () => {
     // Then
     expect(uploadExtensionsBundle).toHaveBeenCalledWith({
       apiKey: 'app-id',
+      organizationId: 'org-id',
       bundlePath: expect.stringMatching(/bundle.zip$/),
       appModules: [{uuid: uiExtension.localIdentifier, config: '{}', context: '', handle: uiExtension.handle}],
       developerPlatformClient,
@@ -200,6 +206,7 @@ describe('deploy', () => {
     // Then
     expect(uploadExtensionsBundle).toHaveBeenCalledWith({
       apiKey: 'app-id',
+      organizationId: 'org-id',
       bundlePath: expect.stringMatching(/bundle.zip$/),
       appModules: [
         {
@@ -239,7 +246,7 @@ describe('deploy', () => {
     // When
     await testDeployBundle({
       app,
-      partnersApp: testOrganizationApp({
+      remoteApp: testOrganizationApp({
         id: 'app-id',
         organizationId: 'org-id',
       }),
@@ -249,6 +256,7 @@ describe('deploy', () => {
     // Then
     expect(uploadExtensionsBundle).toHaveBeenCalledWith({
       apiKey: 'app-id',
+      organizationId: 'org-id',
       appModules: [
         {
           uuid: functionExtension.localIdentifier,
@@ -279,6 +287,7 @@ describe('deploy', () => {
     // Then
     expect(uploadExtensionsBundle).toHaveBeenCalledWith({
       apiKey: 'app-id',
+      organizationId: 'org-id',
       bundlePath: expect.stringMatching(/bundle.zip$/),
       appModules: [
         {uuid: uiExtension.localIdentifier, config: '{}', context: '', handle: uiExtension.handle},
@@ -314,6 +323,7 @@ describe('deploy', () => {
     // Then
     expect(uploadExtensionsBundle).toHaveBeenCalledWith({
       apiKey: 'app-id',
+      organizationId: 'org-id',
       appModules: [
         {
           uuid: extensionNonUuidManaged.localIdentifier,
@@ -343,6 +353,7 @@ describe('deploy', () => {
     // Then
     expect(uploadExtensionsBundle).toHaveBeenCalledWith({
       apiKey: 'app-id',
+      organizationId: 'org-id',
       appModules: [],
       developerPlatformClient,
       extensionIds: {},
@@ -362,12 +373,13 @@ describe('deploy', () => {
     // When
     await testDeployBundle({
       app,
-      partnersApp: {
+      remoteApp: {
         id: 'app-id',
+        apiKey: 'api-key',
         organizationId: 'org-id',
         title: 'app-title',
         grantedScopes: [],
-        betas: [],
+        flags: [],
       },
       options: {
         noRelease: false,
@@ -400,12 +412,13 @@ describe('deploy', () => {
     // When
     await testDeployBundle({
       app,
-      partnersApp: {
+      remoteApp: {
         id: 'app-id2',
+        apiKey: 'api-key',
         organizationId: 'org-id',
         title: 'app-title',
         grantedScopes: [],
-        betas: [],
+        flags: [],
       },
       options: {
         noRelease: false,
@@ -440,12 +453,13 @@ describe('deploy', () => {
     // When
     await testDeployBundle({
       app,
-      partnersApp: {
+      remoteApp: {
         id: 'app-id',
+        apiKey: 'api-key',
         organizationId: 'org-id',
         title: 'app-title',
         grantedScopes: [],
-        betas: [],
+        flags: [],
       },
       options: {
         noRelease: true,
@@ -479,7 +493,7 @@ describe('deploy', () => {
 
 interface TestDeployBundleInput {
   app: AppInterface
-  partnersApp?: Omit<OrganizationApp, 'apiSecretKeys' | 'apiKey'>
+  remoteApp?: Omit<OrganizationApp, 'apiSecretKeys'>
   options?: {
     force?: boolean
     noRelease?: boolean
@@ -494,7 +508,7 @@ interface TestDeployBundleInput {
 
 async function testDeployBundle({
   app,
-  partnersApp,
+  remoteApp,
   options,
   released = true,
   commitReference,
@@ -520,8 +534,8 @@ async function testDeployBundle({
   vi.mocked(ensureDeployContext).mockResolvedValue({
     app: appToDeploy ?? app,
     identifiers,
-    partnersApp:
-      partnersApp ??
+    remoteApp:
+      remoteApp ??
       testOrganizationApp({
         id: 'app-id',
         organizationId: 'org-id',
@@ -538,9 +552,6 @@ async function testDeployBundle({
     location: 'https://partners.shopify.com/0/apps/0/versions/1',
   })
   vi.mocked(updateAppIdentifiers).mockResolvedValue(app)
-  vi.mocked(fetchAppExtensionRegistrations).mockResolvedValue({
-    app: {extensionRegistrations: [], configurationRegistrations: [], dashboardManagedExtensionRegistrations: []},
-  })
 
   await deploy({
     app,

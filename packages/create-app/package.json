@@ -1,6 +1,6 @@
 {
   "name": "@shopify/create-app",
-  "version": "3.57.0",
+  "version": "3.58.0",
   "private": false,
   "description": "A CLI tool to create a new Shopify app.",
   "keywords": [
@@ -19,6 +19,10 @@
   "license": "MIT",
   "type": "module",
   "exports": {
+    "./commands/*": {
+      "import": "./dist/commands/*.js",
+      "require": "./dist/commands/*.d.ts"
+    },
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
@@ -35,6 +39,7 @@
   ],
   "scripts": {
     "build": "nx build",
+    "bundle": "nx bundle",
     "clean": "nx clean",
     "lint": "nx lint",
     "lint:fix": "nx lint:fix",
@@ -50,11 +55,12 @@
   },
   "dependencies": {
     "@oclif/core": "3.19.6",
-    "@shopify/cli-kit": "3.57.0"
+    "@shopify/cli-kit": "3.58.0"
   },
   "devDependencies": {
     "@types/node": "18.19.3",
-    "vite": "^4.4.9",
+    "esbuild-plugin-copy": "^2.1.1",
+    "@vitest/coverage-istanbul": "^0.34.3",
     "vitest": "^0.34.3"
   },
   "engines": {

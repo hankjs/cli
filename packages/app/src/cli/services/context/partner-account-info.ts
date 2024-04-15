@@ -1,6 +1,6 @@
-import {geCurrentAccountInfo} from '../../api/graphql/current_account_info.js'
+import {getCurrentAccountInfo} from '../../api/graphql/current_account_info.js'
+import {DeveloperPlatformClient} from '../../utilities/developer-platform-client.js'
 import {outputDebug} from '@shopify/cli-kit/node/output'
-import {ensureAuthenticatedPartners} from '@shopify/cli-kit/node/session'
 
 export interface PartnersSession {
   token: string
@@ -31,21 +31,11 @@ export function isServiceAccount(account: AccountInfo): account is ServiceAccoun
   return account.type === 'ServiceAccount'
 }
 
-export function isUnknownAccount(account: AccountInfo): account is UnknownAccountInfo {
-  return account.type === 'UnknownAccount'
-}
-
-export async function fetchPartnersSession(): Promise<PartnersSession> {
-  const token = await ensureAuthenticatedPartners()
-  return {
-    token,
-    accountInfo: await fetchCurrentAccountInformation(token),
-  }
-}
-
-async function fetchCurrentAccountInformation(token: string): Promise<AccountInfo> {
+export async function fetchCurrentAccountInformation(
+  developerPlatformClient: DeveloperPlatformClient,
+): Promise<AccountInfo> {
   try {
-    return await geCurrentAccountInfo(token)
+    return await getCurrentAccountInfo(developerPlatformClient)
     // eslint-disable-next-line no-catch-all/no-catch-all
   } catch (error) {
     outputDebug('Error fetching user account info')

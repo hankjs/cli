@@ -5,7 +5,7 @@
       ],
       "args": {
       },
-      "description": "Logout from Shopify.",
+      "description": "Logs you out of the Shopify account or Partner account and store.",
       "flags": {
       },
       "hasDynamicHelp": false,
@@ -193,6 +193,95 @@
       ],
       "strict": true
     },
+    "docs:generate": {
+      "aliases": [
+      ],
+      "args": {
+      },
+      "description": "Generate CLI commands documentation",
+      "flags": {
+      },
+      "hasDynamicHelp": false,
+      "hidden": true,
+      "hiddenAliases": [
+      ],
+      "id": "docs:generate",
+      "isESM": true,
+      "pluginAlias": "@shopify/cli",
+      "pluginName": "@shopify/cli",
+      "pluginType": "core",
+      "relativePath": [
+        "dist",
+        "cli",
+        "commands",
+        "docs",
+        "generate.js"
+      ],
+      "strict": true
+    },
+    "help": {
+      "aliases": [
+      ],
+      "args": {
+        "command": {
+          "description": "Command to show help for.",
+          "name": "command",
+          "required": false
+        }
+      },
+      "description": "Display help for Shopify CLI",
+      "flags": {
+        "nested-commands": {
+          "allowNo": false,
+          "char": "n",
+          "description": "Include all nested commands in the output.",
+          "env": "SHOPIFY_FLAG_CLI_NESTED_COMMANDS",
+          "name": "nested-commands",
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [
+      ],
+      "id": "help",
+      "isESM": true,
+      "pluginAlias": "@shopify/cli",
+      "pluginName": "@shopify/cli",
+      "pluginType": "core",
+      "relativePath": [
+        "dist",
+        "cli",
+        "commands",
+        "help.js"
+      ],
+      "strict": false
+    },
+    "hydrogen:init": {
+      "aliases": [
+      ],
+      "args": {
+      },
+      "flags": {
+      },
+      "hasDynamicHelp": false,
+      "hidden": true,
+      "hiddenAliases": [
+      ],
+      "id": "hydrogen:init",
+      "isESM": true,
+      "pluginAlias": "@shopify/cli",
+      "pluginName": "@shopify/cli",
+      "pluginType": "core",
+      "relativePath": [
+        "dist",
+        "cli",
+        "commands",
+        "hydrogen",
+        "init.js"
+      ],
+      "strict": false,
+      "summary": "Create a new hydrogen project"
+    },
     "kitchen-sink": {
       "aliases": [
       ],
@@ -332,6 +421,9 @@
         }
       },
       "description": "Starts a search on shopify.dev.",
+      "examples": [
+        "# open the search modal on Shopify.dev\n    shopify search\n\n    # search for a term on Shopify.dev\n    shopify search <query>\n\n    # search for a phrase on Shopify.dev\n    shopify search \"<a search query separated by spaces>\"\n    "
+      ],
       "flags": {
       },
       "hasDynamicHelp": false,
@@ -355,7 +447,8 @@
       ],
       "args": {
       },
-      "description": "Upgrade the Shopify CLI.",
+      "description": "If the CLI is installed as a dependency of your app project, this command will upgrade it. Otherwise, refer to the \"upgrade\" (https://shopify.dev/docs/api/shopify-cli#upgrade) documentation.",
+      "descriptionWithMarkdown": "If the CLI is installed as a dependency of your app project, this command will upgrade it. Otherwise, refer to the [upgrade](https://shopify.dev/docs/api/shopify-cli#upgrade) documentation.",
       "flags": {
         "path": {
           "default": ".",
@@ -382,14 +475,15 @@
         "commands",
         "upgrade.js"
       ],
-      "strict": true
+      "strict": true,
+      "summary": "Upgrade your CLI dependency."
     },
     "version": {
       "aliases": [
       ],
       "args": {
       },
-      "description": "Shopify CLI version.",
+      "description": "Shopify CLI version currently installed.",
       "flags": {
       },
       "hasDynamicHelp": false,
@@ -409,5 +503,5 @@
       "strict": true
     }
   },
-  "version": "3.57.0"
+  "version": "3.58.0"
 }

@@ -1,4 +1,4 @@
-import {httpsRegex, validateUrl} from '../../../app/validation/common.js'
+import {httpsRegex} from '../../../app/validation/common.js'
 import {zod} from '@shopify/cli-kit/node/schema'
 
 // example PubSub URI - pubsub://{project}:{topic}
@@ -10,13 +10,17 @@ const arnRegex =
 export const removeTrailingSlash = (arg: unknown) =>
   typeof arg === 'string' && arg.endsWith('/') ? arg.replace(/\/+$/, '') : arg
 
-export const ensureHttpsOnlyUrl = validateUrl(zod.string(), {
-  httpsOnly: true,
-  message: 'Only https urls are allowed',
-}).refine((url) => !url.endsWith('/'), {message: 'URL can’t end with a forward slash'})
-
-export const UriValidation = zod.union([
-  zod.string().regex(httpsRegex),
-  zod.string().regex(pubSubRegex),
-  zod.string().regex(arnRegex),
-])
+export const UriValidation = zod.union(
+  [
+    zod.string({invalid_type_error: 'Value must be string'}).regex(httpsRegex, {
+      message: "URI isn't correct URI format of https://, pubsub://{project}:topic or Eventbridge ARN",
+    }),
+    zod.string({invalid_type_error: 'Value must be string'}).regex(pubSubRegex, {
+      message: "URI isn't correct URI format of https://, pubsub://{project}:topic or Eventbridge ARN",
+    }),
+    zod.string({invalid_type_error: 'Value must be string'}).regex(arnRegex, {
+      message: "URI isn't correct URI format of https://, pubsub://{project}:topic or Eventbridge ARN",
+    }),
+  ],
+  {invalid_type_error: 'Invalid URI format'},
+)

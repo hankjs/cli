@@ -1,6 +1,7 @@
 export const environmentVariableNames = {
   skipEsbuildReactDedeuplication: 'SHOPIFY_CLI_SKIP_ESBUILD_REACT_DEDUPLICATION',
   disableGraphiQLExplorer: 'SHOPIFY_CLI_DISABLE_GRAPHIQL',
+  useDynamicConfigSpecifications: 'SHOPIFY_CLI_DYNAMIC_CONFIG',
 }
 
 export const configurationFileNames = {
@@ -28,12 +29,8 @@ export const blocks = {
   },
 } as const
 
-export const urlNamespaces = {
-  devTools: '.shopify',
-} as const
-
 export const ports = {
   graphiql: 3457,
 } as const
 
-export const EsbuildEnvVarRegex = /^([a-zA-Z0-9_])*$/
+export const EsbuildEnvVarRegex = /^([a-zA-Z_$])([a-zA-Z0-9_$])*$/

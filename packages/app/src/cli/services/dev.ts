@@ -18,7 +18,7 @@ import {DeveloperPreviewController} from './dev/ui/components/Dev.js'
 import {DevProcessFunction} from './dev/processes/types.js'
 import {setCachedAppInfo} from './local-storage.js'
 import {canEnablePreviewMode} from './extensions/common.js'
-import {selectDeveloperPlatformClient} from '../utilities/developer-platform-client.js'
+import {DeveloperPlatformClient, selectDeveloperPlatformClient} from '../utilities/developer-platform-client.js'
 import {Web, isCurrentAppSchema, getAppScopesArray, AppInterface} from '../models/app/app.js'
 import {OrganizationApp} from '../models/organization.js'
 import {getAnalyticsTunnelType} from '../utilities/analytics.js'
@@ -37,7 +37,6 @@ import {reportAnalyticsEvent} from '@shopify/cli-kit/node/analytics'
 import {OutputProcess, formatPackageManagerCommand, outputDebug} from '@shopify/cli-kit/node/output'
 import {hashString} from '@shopify/cli-kit/node/crypto'
 import {AbortError} from '@shopify/cli-kit/node/error'
-import {ensureAuthenticatedPartners} from '@shopify/cli-kit/node/session'
 
 export interface DevOptions {
   directory: string
@@ -77,8 +76,6 @@ async function prepareForDev(commandOptions: DevOptions): Promise<DevConfig> {
   }
 
   const developerPlatformClient = selectDeveloperPlatformClient()
-  const partnersSession = await developerPlatformClient.session()
-  const token = partnersSession.token
 
   const {
     storeFqdn,
@@ -96,8 +93,23 @@ async function prepareForDev(commandOptions: DevOptions): Promise<DevConfig> {
     localApp = await installAppDependencies(localApp)
   }
 
-  const graphiqlPort = commandOptions.graphiqlPort || ports.graphiql
+  const graphiqlPort = commandOptions.graphiqlPort || (await getAvailableTCPPort(ports.graphiql))
   const {graphiqlKey} = commandOptions
+
+  if (graphiqlPort !== (commandOptions.graphiqlPort || ports.graphiql)) {
+    renderWarning({
+      headline: [
+        'A random port will be used for GraphiQL because',
+        {command: `${ports.graphiql}`},
+        'is not available.',
+      ],
+      body: [
+        'If you want to keep your session in GraphiQL, you can choose a different one by setting the',
+        {command: '--graphiql-port'},
+        'flag.',
+      ],
+    })
+  }
 
   const {webs, ...network} = await setupNetworkingOptions(
     localApp.webs,
@@ -119,7 +131,7 @@ async function prepareForDev(commandOptions: DevOptions): Promise<DevConfig> {
     cachedUpdateURLs,
     remoteApp,
     apiKey,
-    token,
+    developerPlatformClient,
   )
 
   return {
@@ -189,7 +201,7 @@ async function handleUpdatingOfPartnerUrls(
   cachedUpdateURLs: boolean | undefined,
   remoteApp: Omit<OrganizationApp, 'apiSecretKeys'> & {apiSecret?: string | undefined},
   apiKey: string,
-  token: string,
+  developerPlatformClient: DeveloperPlatformClient,
 ) {
   const {backendConfig, frontendConfig} = frontAndBackendConfig(webs)
   let shouldUpdateURLs = false
@@ -210,7 +222,7 @@ async function handleUpdatingOfPartnerUrls(
       })
       // When running dev app urls are pushed directly to API Client config instead of creating a new app version
       // so current app version and API Client config will have diferent url values.
-      if (shouldUpdateURLs) await updateURLs(newURLs, apiKey, token, localApp)
+      if (shouldUpdateURLs) await updateURLs(newURLs, apiKey, developerPlatformClient, localApp)
       await outputUpdateURLsResult(shouldUpdateURLs, newURLs, remoteApp, localApp)
     }
   }
@@ -283,18 +295,17 @@ async function launchDevProcesses({
   })
 
   const apiKey = config.remoteApp.apiKey
-  const partnersSession = await config.developerPlatformClient.session()
-  const token = partnersSession.token
+  const developerPlatformClient = config.developerPlatformClient
   const app = {
     canEnablePreviewMode: await canEnablePreviewMode({
-      remoteApp: config.remoteApp,
       localApp: config.localApp,
-      token,
+      developerPlatformClient,
       apiKey,
+      organizationId: config.remoteApp.organizationId,
     }),
     developmentStorePreviewEnabled: config.remoteApp.developmentStorePreviewEnabled,
     apiKey,
-    token,
+    developerPlatformClient,
   }
 
   return renderDev({
@@ -304,21 +315,23 @@ async function launchDevProcesses({
     graphiqlPort: config.graphiqlPort,
     app,
     abortController,
-    developerPreview: developerPreviewController(apiKey, token),
+    developerPreview: developerPreviewController(apiKey, developerPlatformClient),
   })
 }
 
-export function developerPreviewController(apiKey: string, originalToken: string): DeveloperPreviewController {
-  let currentToken = originalToken
-
+export function developerPreviewController(
+  apiKey: string,
+  developerPlatformClient: DeveloperPlatformClient,
+): DeveloperPreviewController {
   const refreshToken = async () => {
-    const newToken = await ensureAuthenticatedPartners([], process.env, {noPrompt: true})
-    if (newToken) currentToken = newToken
+    await developerPlatformClient.refreshToken()
   }
 
-  const withRefreshToken = async <T>(fn: (token: string) => Promise<T>): Promise<T> => {
+  const withRefreshToken = async <T>(
+    fn: (developerPlatformClient: DeveloperPlatformClient) => Promise<T>,
+  ): Promise<T> => {
     try {
-      const result = await performActionWithRetryAfterRecovery(async () => fn(currentToken), refreshToken)
+      const result = await performActionWithRetryAfterRecovery(async () => fn(developerPlatformClient), refreshToken)
       return result
     } catch (err) {
       outputDebug('Failed to refresh token')
@@ -327,21 +340,26 @@ export function developerPreviewController(apiKey: string, originalToken: string
   }
 
   return {
-    fetchMode: async () => withRefreshToken(async (token: string) => Boolean(await fetchAppPreviewMode(apiKey, token))),
+    fetchMode: async () =>
+      withRefreshToken(async (developerPlatformClient: DeveloperPlatformClient) =>
+        Boolean(await fetchAppPreviewMode(apiKey, developerPlatformClient)),
+      ),
     enable: async () =>
-      withRefreshToken(async (token: string) => {
-        await enableDeveloperPreview({apiKey, token})
+      withRefreshToken(async (developerPlatformClient: DeveloperPlatformClient) => {
+        await enableDeveloperPreview({apiKey, developerPlatformClient})
       }),
     disable: async () =>
-      withRefreshToken(async (token: string) => {
-        await disableDeveloperPreview({apiKey, token})
+      withRefreshToken(async (developerPlatformClient: DeveloperPlatformClient) => {
+        await disableDeveloperPreview({apiKey, developerPlatformClient})
       }),
     update: async (state: boolean) =>
-      withRefreshToken(async (token: string) => developerPreviewUpdate({apiKey, token, enabled: state})),
+      withRefreshToken(async (developerPlatformClient: DeveloperPlatformClient) =>
+        developerPreviewUpdate({apiKey, developerPlatformClient, enabled: state}),
+      ),
   }
 }
 
-export async function logMetadataForDev(options: {
+async function logMetadataForDev(options: {
   devOptions: DevOptions
   tunnelUrl: string
   shouldUpdateURLs: boolean
@@ -363,7 +381,7 @@ export async function logMetadataForDev(options: {
   }))
 }
 
-export function scopesMessage(scopes: string[]) {
+function scopesMessage(scopes: string[]) {
   return {
     list: {
       items: scopes.length === 0 ? ['No scopes'] : scopes,
@@ -371,7 +389,7 @@ export function scopesMessage(scopes: string[]) {
   }
 }
 
-export async function validateCustomPorts(webConfigs: Web[], graphiqlPort: number) {
+async function validateCustomPorts(webConfigs: Web[], graphiqlPort: number) {
   const allPorts = webConfigs.map((config) => config.configuration.port).filter((port) => port)
   const duplicatedPort = allPorts.find((port, index) => allPorts.indexOf(port) !== index)
   if (duplicatedPort) {
@@ -395,6 +413,6 @@ export async function validateCustomPorts(webConfigs: Web[], graphiqlPort: numbe
   ])
 }
 
-export function setPreviousAppId(directory: string, apiKey: string) {
+function setPreviousAppId(directory: string, apiKey: string) {
   setCachedAppInfo({directory, previousAppId: apiKey})
 }

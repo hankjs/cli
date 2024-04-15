@@ -16,6 +16,14 @@ vi.mock('esbuild', async () => {
   }
 })
 
+vi.mock('@luckycatfactory/esbuild-graphql-loader', () => ({
+  default: {
+    default: () => {
+      return {name: 'graphql-loader', setup: vi.fn()}
+    },
+  },
+}))
+
 describe('bundleExtension()', () => {
   test('invokes ESBuild with the right options and forwards the logs', async () => {
     // Given
@@ -63,7 +71,7 @@ describe('bundleExtension()', () => {
         stdout,
         stderr,
       },
-      {VAR_FROM_RUNTIME: 'runtime_var', 'INVALID(VAR)': 'invalid_var'},
+      {VAR_FROM_RUNTIME: 'runtime_var', 'INVALID(VAR)': 'invalid_var', '123NUMERIC_VAR': 'invalid_var'},
     )
 
     // Then

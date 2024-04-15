@@ -3,14 +3,20 @@ import {
   AppConfiguration,
   AppInterface,
   EmptyApp,
+  getAppScopes,
   isCurrentAppSchema,
   isLegacyAppSchema,
 } from '../../../models/app/app.js'
 import {OrganizationApp} from '../../../models/organization.js'
 import {selectConfigName} from '../../../prompts/config.js'
 import {getAppConfigurationFileName, loadApp} from '../../../models/app/loader.js'
-import {InvalidApiKeyErrorMessage, fetchOrCreateOrganizationApp, logMetadataForLoadedContext} from '../../context.js'
-import {BetaFlag} from '../../dev/fetch.js'
+import {
+  InvalidApiKeyErrorMessage,
+  fetchOrCreateOrganizationApp,
+  logMetadataForLoadedContext,
+  appFromId,
+} from '../../context.js'
+import {Flag} from '../../dev/fetch.js'
 import {configurationFileNames} from '../../../constants.js'
 import {writeAppConfigurationFile} from '../write-app-configuration-file.js'
 import {getCachedCommandInfo} from '../../local-storage.js'
@@ -18,6 +24,8 @@ import {ExtensionSpecification} from '../../../models/extensions/specification.j
 import {loadLocalExtensionsSpecifications} from '../../../models/extensions/load-specifications.js'
 import {selectDeveloperPlatformClient, DeveloperPlatformClient} from '../../../utilities/developer-platform-client.js'
 import {fetchAppRemoteConfiguration} from '../select-app.js'
+import {fetchSpecifications} from '../../generate/fetch-extension-specifications.js'
+import {SpecsAppConfiguration} from '../../../models/extensions/specifications/types/app_config.js'
 import {renderSuccess} from '@shopify/cli-kit/node/ui'
 import {AbortError} from '@shopify/cli-kit/node/error'
 import {formatPackageManagerCommand} from '@shopify/cli-kit/node/output'
@@ -41,14 +49,22 @@ export default async function link(options: LinkOptions, shouldRenderSuccess = t
   await logMetadataForLoadedContext(remoteApp)
 
   let configuration = addLocalAppConfig(localApp.configuration, remoteApp, configFilePath)
-  const remoteAppConfiguration = await fetchAppRemoteConfiguration(
-    remoteApp.apiKey,
-    developerPlatformClient,
-    localApp.specifications ?? [],
-    localApp.remoteBetaFlags,
-  )
+  const remoteAppConfiguration =
+    (await fetchAppRemoteConfiguration(
+      remoteApp,
+      developerPlatformClient,
+      localApp.specifications ?? [],
+      localApp.remoteFlags,
+    )) ?? buildRemoteApiClientConfiguration(configuration, remoteApp)
   const replaceLocalArrayStrategy = (_destinationArray: unknown[], sourceArray: unknown[]) => sourceArray
-  configuration = deepMergeObjects(configuration, remoteAppConfiguration, replaceLocalArrayStrategy)
+  configuration = deepMergeObjects(
+    configuration,
+    {
+      ...(developerPlatformClient.requiresOrganization ? {organization_id: remoteApp.organizationId} : {}),
+      ...remoteAppConfiguration,
+    },
+    replaceLocalArrayStrategy,
+  )
 
   await writeAppConfigurationFile(configuration, localApp.configSchema)
   await saveCurrentConfig({configFileName, directory})
@@ -71,8 +87,11 @@ async function selectRemoteApp(options: LinkOptions & Required<Pick<LinkOptions,
 }
 
 async function loadLocalApp(options: LinkOptions, remoteApp: OrganizationApp, directory: string) {
-  const specifications = await options.developerPlatformClient!.specifications(remoteApp.apiKey)
-  const localApp = await loadAppOrEmptyApp(options, specifications, remoteApp.betas, remoteApp)
+  const specifications = await fetchSpecifications({
+    developerPlatformClient: options.developerPlatformClient!,
+    apiKey: remoteApp.apiKey,
+  })
+  const localApp = await loadAppOrEmptyApp(options, specifications, remoteApp.flags, remoteApp)
   const configFileName = await loadConfigurationFileName(remoteApp, options, localApp)
   const configFilePath = joinPath(directory, configFileName)
   return {
@@ -85,7 +104,7 @@ async function loadLocalApp(options: LinkOptions, remoteApp: OrganizationApp, di
 async function loadAppOrEmptyApp(
   options: LinkOptions,
   specifications?: ExtensionSpecification[],
-  remoteBetas?: BetaFlag[],
+  remoteFlags?: Flag[],
   remoteApp?: OrganizationApp,
 ): Promise<AppInterface> {
   try {
@@ -94,14 +113,14 @@ async function loadAppOrEmptyApp(
       directory: options.directory,
       mode: 'report',
       configName: options.baseConfigName,
-      remoteBetas,
+      remoteFlags,
     })
     const configuration = app.configuration
     if (!isCurrentAppSchema(configuration) || remoteApp?.apiKey === configuration.client_id) return app
-    return new EmptyApp(await loadLocalExtensionsSpecifications(), remoteBetas, remoteApp?.apiKey)
+    return new EmptyApp(await loadLocalExtensionsSpecifications(), remoteFlags, remoteApp?.apiKey)
     // eslint-disable-next-line no-catch-all/no-catch-all
   } catch (error) {
-    return new EmptyApp(await loadLocalExtensionsSpecifications(), remoteBetas)
+    return new EmptyApp(await loadLocalExtensionsSpecifications(), remoteFlags)
   }
 }
 
@@ -114,7 +133,7 @@ async function loadRemoteApp(
   if (!apiKey) {
     return fetchOrCreateOrganizationApp(localApp, developerPlatformClient, directory)
   }
-  const app = await developerPlatformClient.appFromId(apiKey)
+  const app = await appFromId({apiKey, developerPlatformClient})
   if (!app) {
     const errorMessage = InvalidApiKeyErrorMessage(apiKey)
     throw new AbortError(errorMessage.message, errorMessage.tryMessage)
@@ -189,4 +208,108 @@ function renderSuccessMessage(configFileName: string, appName: string, localApp:
       },
     ],
   })
+}
+
+function buildRemoteApiClientConfiguration(
+  appConfiguration: AppConfiguration,
+  remoteApp: OrganizationApp,
+): SpecsAppConfiguration {
+  return {
+    ...addBrandingConfig(remoteApp),
+    ...addPosConfig(remoteApp),
+    ...addRemoteAppWebhooksConfig(remoteApp),
+    ...addRemoteAppAccessConfig(appConfiguration, remoteApp),
+    ...addRemoteAppProxyConfig(remoteApp),
+    ...addRemoteAppHomeConfig(remoteApp),
+  }
+}
+
+function addRemoteAppHomeConfig(remoteApp: OrganizationApp) {
+  const homeConfig = {
+    application_url: remoteApp.applicationUrl?.replace(/\/$/, '') || '',
+    embedded: remoteApp.embedded === undefined ? true : remoteApp.embedded,
+  }
+  return remoteApp.preferencesUrl
+    ? {
+        ...homeConfig,
+        app_preferences: {
+          url: remoteApp.preferencesUrl,
+        },
+      }
+    : {...homeConfig}
+}
+
+function addRemoteAppProxyConfig(remoteApp: OrganizationApp) {
+  return remoteApp.appProxy?.url
+    ? {
+        app_proxy: {
+          url: remoteApp.appProxy.url,
+          subpath: remoteApp.appProxy.subPath,
+          prefix: remoteApp.appProxy.subPathPrefix,
+        },
+      }
+    : {}
+}
+
+function addRemoteAppWebhooksConfig(remoteApp: OrganizationApp) {
+  const hasAnyPrivacyWebhook =
+    remoteApp.gdprWebhooks?.customerDataRequestUrl ||
+    remoteApp.gdprWebhooks?.customerDeletionUrl ||
+    remoteApp.gdprWebhooks?.shopDeletionUrl
+
+  const privacyComplianceContent = {
+    privacy_compliance: {
+      customer_data_request_url: remoteApp.gdprWebhooks?.customerDataRequestUrl,
+      customer_deletion_url: remoteApp.gdprWebhooks?.customerDeletionUrl,
+      shop_deletion_url: remoteApp.gdprWebhooks?.shopDeletionUrl,
+    },
+  }
+
+  return {
+    webhooks: {
+      api_version: remoteApp.webhookApiVersion || '2023-07',
+      ...(hasAnyPrivacyWebhook ? privacyComplianceContent : {}),
+    },
+  }
+}
+
+function addRemoteAppAccessConfig(appConfiguration: AppConfiguration, remoteApp: OrganizationApp) {
+  let accessScopesContent = {}
+  // if we have upstream scopes, use them
+  if (remoteApp.requestedAccessScopes) {
+    accessScopesContent = {
+      scopes: remoteApp.requestedAccessScopes.join(','),
+    }
+    // if we can't find scopes or have to fall back, omit setting a scope and set legacy to true
+  } else if (getAppScopes(appConfiguration) === '') {
+    accessScopesContent = {
+      use_legacy_install_flow: true,
+    }
+    // if we have scopes locally and not upstream, preserve them but don't push them upstream (legacy is true)
+  } else {
+    accessScopesContent = {
+      scopes: getAppScopes(appConfiguration),
+      use_legacy_install_flow: true,
+    }
+  }
+  return {
+    auth: {
+      redirect_urls: remoteApp.redirectUrlWhitelist ?? [],
+    },
+    access_scopes: accessScopesContent,
+  }
+}
+
+function addPosConfig(remoteApp: OrganizationApp) {
+  return {
+    pos: {
+      embedded: remoteApp.posEmbedded || false,
+    },
+  }
+}
+
+function addBrandingConfig(remoteApp: OrganizationApp) {
+  return {
+    name: remoteApp.title,
+  }
 }

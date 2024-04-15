@@ -34,14 +34,14 @@ export async function selectOrCreateApp(
     const name = await appNamePrompt(localAppName)
     return developerPlatformClient.createApp(org, name, options)
   } else {
-    const selectedAppApiKey = await selectAppPrompt(apps, hasMorePages, org.id, {directory: options?.directory})
+    const app = await selectAppPrompt(apps, hasMorePages, org.id, {directory: options?.directory})
 
     const data = getCachedCommandInfo()
     const tomls = (data?.tomls as {[key: string]: unknown}) ?? {}
 
-    if (tomls[selectedAppApiKey]) setCachedCommandInfo({selectedToml: tomls[selectedAppApiKey], askConfigName: false})
+    if (tomls[app.apiKey]) setCachedCommandInfo({selectedToml: tomls[app.apiKey], askConfigName: false})
 
-    const fullSelectedApp = await developerPlatformClient.appFromId(selectedAppApiKey)
+    const fullSelectedApp = await developerPlatformClient.appFromId(app)
     return fullSelectedApp!
   }
 }

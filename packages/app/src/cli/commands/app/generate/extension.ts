@@ -3,13 +3,21 @@ import metadata from '../../../metadata.js'
 import Command from '../../../utilities/app-command.js'
 import generate from '../../../services/generate.js'
 import {showApiKeyDeprecationWarning} from '../../../prompts/deprecation-warnings.js'
+import {checkFolderIsValidApp} from '../../../models/app/loader.js'
 import {Args, Flags} from '@oclif/core'
 import {globalFlags} from '@shopify/cli-kit/node/cli'
 import {renderWarning} from '@shopify/cli-kit/node/ui'
 
 export default class AppGenerateExtension extends Command {
-  static description = 'Scaffold an Extension.'
+  static summary = 'Generate a new app Extension.'
   static examples = ['<%= config.bin %> <%= command.id %>']
+
+  static descriptionWithMarkdown = `Generates a new [app extension](https://shopify.dev/docs/apps/app-extensions). For a list of app extensions that you can generate using this command, refer to [Supported extensions](https://shopify.dev/docs/apps/tools/cli/commands#supported-extensions).
+
+  Each new app extension is created in a folder under \`extensions/\`. To learn more about the extensions file structure, refer to [App structure](https://shopify.dev/docs/apps/tools/cli/structure) and the documentation for your extension.
+  `
+
+  static description = this.descriptionWithoutMarkdown()
 
   static flags = {
     ...globalFlags,
@@ -94,6 +102,8 @@ export default class AppGenerateExtension extends Command {
       })
       return
     }
+
+    await checkFolderIsValidApp(flags.path)
 
     await generate({
       directory: flags.path,

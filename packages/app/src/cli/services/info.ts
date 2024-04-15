@@ -17,6 +17,7 @@ import {
   stringifyMessage,
   getOutputUpdateCLIReminder,
 } from '@shopify/cli-kit/node/output'
+import {CLI_KIT_VERSION} from '@shopify/cli-kit/common/version'
 
 export type Format = 'json' | 'text'
 export interface InfoOptions {
@@ -39,11 +40,11 @@ export async function info(app: AppInterface, options: InfoOptions): Promise<Out
   }
 }
 
-export async function infoWeb(app: AppInterface, {format}: InfoOptions): Promise<OutputMessage> {
+async function infoWeb(app: AppInterface, {format}: InfoOptions): Promise<OutputMessage> {
   return outputEnv(app, format)
 }
 
-export async function infoApp(app: AppInterface, options: InfoOptions): Promise<OutputMessage> {
+async function infoApp(app: AppInterface, options: InfoOptions): Promise<OutputMessage> {
   if (options.format === 'json') {
     const extensionsInfo = withPurgedSchemas(app.allExtensions.filter((ext) => ext.isReturnedAsInfo()))
     let appWithSupportedExtensions = {
@@ -263,7 +264,7 @@ class AppInfo {
     const title = 'Tooling and System'
     const {platform, arch} = platformAndArch()
     const versionUpgradeMessage = await this.versionUpgradeMessage()
-    const cliVersionInfo = [this.currentCliVersion(), versionUpgradeMessage].join(' ').trim()
+    const cliVersionInfo = [CLI_KIT_VERSION, versionUpgradeMessage].join(' ').trim()
     const lines: string[][] = [
       ['Shopify CLI', cliVersionInfo],
       ['Package manager', this.app.packageManager],
@@ -274,13 +275,9 @@ class AppInfo {
     return [title, `${linesToColumns(lines)}`]
   }
 
-  currentCliVersion(): string {
-    return this.app.nodeDependencies['@shopify/cli']!
-  }
-
   async versionUpgradeMessage(): Promise<string> {
     const cliDependency = '@shopify/cli'
-    const newestVersion = await checkForNewVersion(cliDependency, this.currentCliVersion())
+    const newestVersion = await checkForNewVersion(cliDependency, CLI_KIT_VERSION)
     if (newestVersion) {
       return getOutputUpdateCLIReminder(this.app.packageManager, newestVersion)
     }

@@ -5,23 +5,23 @@ import {
   CurrentAppConfiguration,
   isCurrentAppSchema,
 } from '../../models/app/app.js'
-import {UpdateURLsQuery, UpdateURLsQuerySchema, UpdateURLsQueryVariables} from '../../api/graphql/update_urls.js'
+import {UpdateURLsSchema, UpdateURLsVariables} from '../../api/graphql/update_urls.js'
 import {setCachedAppInfo} from '../local-storage.js'
 import {writeAppConfigurationFile} from '../app/write-app-configuration-file.js'
 import {SpecsAppConfiguration} from '../../models/extensions/specifications/types/app_config.js'
+import {DeveloperPlatformClient} from '../../utilities/developer-platform-client.js'
 import {AbortError, BugError} from '@shopify/cli-kit/node/error'
 import {Config} from '@oclif/core'
 import {checkPortAvailability, getAvailableTCPPort} from '@shopify/cli-kit/node/tcp'
 import {isValidURL} from '@shopify/cli-kit/common/url'
-import {partnersRequest} from '@shopify/cli-kit/node/api/partners'
-import {appHost, appPort, isSpin, spinFqdn} from '@shopify/cli-kit/node/context/spin'
+import {appHost, appPort, fetchSpinPort, isSpin, spinFqdn, spinVariables} from '@shopify/cli-kit/node/context/spin'
 import {codespaceURL, codespacePortForwardingDomain, gitpodURL} from '@shopify/cli-kit/node/context/local'
 import {fanoutHooks} from '@shopify/cli-kit/node/plugins'
 import {terminalSupportsRawMode} from '@shopify/cli-kit/node/system'
 import {TunnelClient} from '@shopify/cli-kit/node/plugins/tunnel'
 import {outputDebug} from '@shopify/cli-kit/node/output'
 
-export interface AppProxy {
+interface AppProxy {
   proxyUrl: string
   proxySubPath: string
   proxySubPathPrefix: string
@@ -39,7 +39,7 @@ export interface FrontendURLOptions {
   tunnelClient: TunnelClient | undefined
 }
 
-export interface FrontendURLResult {
+interface FrontendURLResult {
   frontendUrl: string
   frontendPort: number
   usingLocalhost: boolean
@@ -74,13 +74,22 @@ export async function generateFrontendURL(options: FrontendURLOptions): Promise<
   }
 
   if (isSpin() && !options.tunnelUrl) {
-    frontendUrl = `https://cli.${await spinFqdn()}`
-    const cliMainServicePort = appPort()
-    if (cliMainServicePort !== undefined && (await checkPortAvailability(cliMainServicePort))) {
-      frontendPort = cliMainServicePort
+    const cliPortProcfileExecution = appPort()
+    if (cliPortProcfileExecution !== undefined && (await checkPortAvailability(cliPortProcfileExecution))) {
       frontendUrl = `https://${appHost()}`
+      return {frontendUrl, frontendPort: cliPortProcfileExecution, usingLocalhost}
     }
-    return {frontendUrl, frontendPort, usingLocalhost}
+    const cliPortManualExecution = await fetchSpinPort(
+      spinVariables.partnersSpinService,
+      spinVariables.manualCliSpinPortName,
+    )
+    if (cliPortManualExecution !== undefined) {
+      frontendUrl = `https://cli.${await spinFqdn()}`
+      return {frontendUrl, frontendPort: cliPortManualExecution, usingLocalhost}
+    }
+    throw new AbortError(
+      `Error building cli url in spin, cli as service port: ${cliPortProcfileExecution}, manual cli port: ${cliPortManualExecution}`,
+    )
   }
 
   if (options.tunnelUrl) {
@@ -182,12 +191,11 @@ function replaceHost(oldUrl: string, newUrl: string): string {
 export async function updateURLs(
   urls: PartnersURLs,
   apiKey: string,
-  token: string,
+  developerPlatformClient: DeveloperPlatformClient,
   localApp?: AppConfigurationInterface,
 ): Promise<void> {
-  const variables: UpdateURLsQueryVariables = {apiKey, ...urls}
-  const query = UpdateURLsQuery
-  const result: UpdateURLsQuerySchema = await partnersRequest(query, token, variables)
+  const variables: UpdateURLsVariables = {apiKey, ...urls}
+  const result: UpdateURLsSchema = await developerPlatformClient.updateURLs(variables)
   if (result.appUpdate.userErrors.length > 0) {
     const errors = result.appUpdate.userErrors.map((error) => error.message).join(', ')
     throw new AbortError(errors)
@@ -233,7 +241,7 @@ export async function getURLs(remoteAppConfig?: SpecsAppConfiguration): Promise<
   return result
 }
 
-export interface ShouldOrPromptUpdateURLsOptions {
+interface ShouldOrPromptUpdateURLsOptions {
   currentURLs: PartnersURLs
   appDirectory: string
   cachedUpdateURLs?: boolean

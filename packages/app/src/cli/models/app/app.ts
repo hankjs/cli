@@ -5,15 +5,14 @@ import {isType} from '../../utilities/types.js'
 import {FunctionConfigType} from '../extensions/specifications/function.js'
 import {ExtensionSpecification} from '../extensions/specification.js'
 import {SpecsAppConfiguration} from '../extensions/specifications/types/app_config.js'
-import {WebhooksConfig} from '../extensions/specifications/types/app_config_webhook.js'
-import {BetaFlag} from '../../services/dev/fetch.js'
+import {Flag} from '../../services/dev/fetch.js'
 import {zod} from '@shopify/cli-kit/node/schema'
 import {DotEnvFile} from '@shopify/cli-kit/node/dot-env'
 import {getDependencies, PackageManager, readAndParsePackageJson} from '@shopify/cli-kit/node/node-package-manager'
 import {fileRealPath, findPathUp} from '@shopify/cli-kit/node/fs'
 import {joinPath} from '@shopify/cli-kit/node/path'
 import {AbortError} from '@shopify/cli-kit/node/error'
-import {getPathValue} from '@shopify/cli-kit/common/object'
+import {setPathValue} from '@shopify/cli-kit/common/object'
 
 export const LegacyAppSchema = zod
   .object({
@@ -27,6 +26,7 @@ export const LegacyAppSchema = zod
 
 export const AppSchema = zod.object({
   client_id: zod.string(),
+  organization_id: zod.string().optional(),
   build: zod
     .object({
       automatically_update_urls_on_dev: zod.boolean().optional(),
@@ -40,14 +40,18 @@ export const AppSchema = zod.object({
 
 export const AppConfigurationSchema = zod.union([LegacyAppSchema, AppSchema])
 
-export function getAppVersionedSchema(specs: ExtensionSpecification[]) {
+export function getAppVersionedSchema(specs: ExtensionSpecification[], allowDynamicallySpecifiedConfigs = false) {
   const isConfigSpecification = (spec: ExtensionSpecification) => spec.experience === 'configuration'
   const schema = specs
     .filter(isConfigSpecification)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .reduce((schema, spec) => schema.merge(spec.schema), AppSchema as any)
 
-  return specs.length > 0 ? schema.strict() : schema
+  if (allowDynamicallySpecifiedConfigs) {
+    return schema.passthrough()
+  } else {
+    return specs.length > 0 ? schema.strict() : schema
+  }
 }
 
 /**
@@ -169,7 +173,7 @@ export interface AppInterface extends AppConfigurationInterface {
   specifications?: ExtensionSpecification[]
   errors?: AppErrors
   includeConfigOnDeploy: boolean | undefined
-  remoteBetaFlags: BetaFlag[]
+  remoteFlags: Flag[]
   hasExtensions: () => boolean
   updateDependencies: () => Promise<void>
   extensionsForType: (spec: {identifier: string; externalIdentifier: string}) => ExtensionInstance[]
@@ -191,7 +195,7 @@ interface AppConstructor {
   errors?: AppErrors
   specifications?: ExtensionSpecification[]
   configSchema?: zod.ZodTypeAny
-  remoteBetaFlags?: BetaFlag[]
+  remoteFlags?: Flag[]
 }
 
 export class App implements AppInterface {
@@ -207,7 +211,7 @@ export class App implements AppInterface {
   errors?: AppErrors
   specifications?: ExtensionSpecification[]
   configSchema: zod.ZodTypeAny
-  remoteBetaFlags: BetaFlag[]
+  remoteFlags: Flag[]
   private realExtensions: ExtensionInstance[]
 
   constructor({
@@ -224,7 +228,7 @@ export class App implements AppInterface {
     errors,
     specifications,
     configSchema,
-    remoteBetaFlags,
+    remoteFlags,
   }: AppConstructor) {
     this.name = name
     this.idEnvironmentVariableName = idEnvironmentVariableName
@@ -239,11 +243,16 @@ export class App implements AppInterface {
     this.usesWorkspaces = usesWorkspaces
     this.specifications = specifications
     this.configSchema = configSchema ?? AppSchema
-    this.remoteBetaFlags = remoteBetaFlags ?? []
+    this.remoteFlags = remoteFlags ?? []
   }
 
   get allExtensions() {
-    return this.realExtensions.filter((ext) => !ext.isAppConfigExtension || this.includeConfigOnDeploy)
+    if (!this.remoteFlags.includes(Flag.DeclarativeWebhooks)) {
+      this.filterDeclarativeWebhooksConfig()
+    }
+
+    if (this.includeConfigOnDeploy) return this.realExtensions
+    return this.realExtensions.filter((ext) => !ext.isAppConfigExtension)
   }
 
   get draftableExtensions() {
@@ -293,68 +302,22 @@ export class App implements AppInterface {
 
   private configurationTyped(configuration: AppConfiguration) {
     if (isLegacyAppSchema(configuration)) return configuration
-    return {
-      ...configuration,
-      ...buildSpecsAppConfiguration(configuration),
-    } as CurrentAppConfiguration & SpecsAppConfiguration
+    return configuration as CurrentAppConfiguration & SpecsAppConfiguration
   }
-}
 
-export function buildSpecsAppConfiguration(content: object) {
-  return {
-    ...homeConfiguration(content),
-    ...appProxyConfiguration(content),
-    ...posConfiguration(content),
-    ...webhooksConfiguration(content),
-    ...accessConfiguration(content),
-  }
-}
+  private filterDeclarativeWebhooksConfig() {
+    const webhooksConfigIndex = this.realExtensions.findIndex((ext) => ext.handle === 'webhooks')
+    const complianceWebhooksConfigIndex = this.realExtensions.findIndex(
+      (ext) => ext.handle === 'privacy-compliance-webhooks',
+    )
 
-function appProxyConfiguration(configuration: object) {
-  if (!getPathValue(configuration, 'app_proxy')) return
-  return {
-    app_proxy: {
-      url: getPathValue<string>(configuration, 'app_proxy.url')!,
-      prefix: getPathValue<string>(configuration, 'app_proxy.prefix')!,
-      subpath: getPathValue<string>(configuration, 'app_proxy.subpath')!,
-    },
-  }
-}
+    if (webhooksConfigIndex > -1) {
+      setPathValue(this.realExtensions, `${webhooksConfigIndex}.configuration.webhooks.subscriptions`, [])
+    }
 
-function homeConfiguration(configuration: object) {
-  const appPreferencesUrl = getPathValue<string>(configuration, 'app_preferences.url')
-  return {
-    name: getPathValue<string>(configuration, 'name')!,
-    application_url: getPathValue<string>(configuration, 'application_url')!,
-    embedded: getPathValue<boolean>(configuration, 'embedded')!,
-    ...(appPreferencesUrl ? {app_preferences: {url: appPreferencesUrl}} : {}),
-  }
-}
-
-function posConfiguration(configuration: object) {
-  const embedded = getPathValue<boolean>(configuration, 'pos.embedded')
-  return embedded === undefined
-    ? undefined
-    : {
-        pos: {
-          embedded,
-        },
-      }
-}
-
-function webhooksConfiguration(configuration: object) {
-  return {
-    webhooks: {...getPathValue<WebhooksConfig>(configuration, 'webhooks')},
-  }
-}
-
-function accessConfiguration(configuration: object) {
-  const scopes = getPathValue<string>(configuration, 'access_scopes.scopes')
-  const useLegacyInstallFlow = getPathValue<boolean>(configuration, 'access_scopes.use_legacy_install_flow')
-  const redirectUrls = getPathValue<string[]>(configuration, 'auth.redirect_urls')
-  return {
-    ...(scopes || useLegacyInstallFlow ? {access_scopes: {scopes, use_legacy_install_flow: useLegacyInstallFlow}} : {}),
-    ...(redirectUrls ? {auth: {redirect_urls: redirectUrls}} : {}),
+    if (complianceWebhooksConfigIndex > -1) {
+      setPathValue(this.realExtensions, `${complianceWebhooksConfigIndex}.configuration.webhooks.subscriptions`, [])
+    }
   }
 }
 
@@ -385,7 +348,7 @@ function findExtensionByHandle(allExtensions: ExtensionInstance[], handle: strin
 }
 
 export class EmptyApp extends App {
-  constructor(specifications?: ExtensionSpecification[], betas?: BetaFlag[], clientId?: string) {
+  constructor(specifications?: ExtensionSpecification[], flags?: Flag[], clientId?: string) {
     const configuration = clientId
       ? {client_id: clientId, access_scopes: {scopes: ''}, path: ''}
       : {scopes: '', path: ''}
@@ -402,7 +365,7 @@ export class EmptyApp extends App {
       usesWorkspaces: false,
       specifications,
       configSchema,
-      remoteBetaFlags: betas ?? [],
+      remoteFlags: flags ?? [],
     })
   }
 }

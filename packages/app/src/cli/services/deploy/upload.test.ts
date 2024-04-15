@@ -12,16 +12,13 @@ import {fetch, formData} from '@shopify/cli-kit/node/http'
 import {joinPath} from '@shopify/cli-kit/node/path'
 import {AbortError} from '@shopify/cli-kit/node/error'
 
-vi.mock('@shopify/cli-kit/node/api/partners')
 vi.mock('@shopify/cli-kit/node/http')
-vi.mock('@shopify/cli-kit/node/session')
 vi.mock('@shopify/cli-kit/node/crypto')
 
 describe('uploadWasmBlob', () => {
   let extension: ExtensionInstance<FunctionConfigType>
   let identifiers: Identifiers
   let apiKey: string
-  let token: string
 
   beforeEach(async () => {
     extension = await testFunctionExtension({
@@ -53,7 +50,6 @@ describe('uploadWasmBlob', () => {
       },
     })
     apiKey = 'api-key'
-    token = 'token'
     identifiers = {
       app: 'api=key',
       extensions: {},
@@ -325,13 +321,12 @@ describe('uploadExtensionsBundle', () => {
       const mockedFormData = {append: vi.fn(), getHeaders: vi.fn()}
       vi.mocked<any>(formData).mockReturnValue(mockedFormData)
       const developerPlatformClient = testDeveloperPlatformClient()
-      const {deploy} = developerPlatformClient
-      const deploySpy = vi.spyOn(developerPlatformClient, 'deploy').mockImplementation(deploy)
 
       // When
       await writeFile(joinPath(tmpDir, 'test.zip'), '')
       await uploadExtensionsBundle({
         apiKey: 'app-id',
+        organizationId: '1',
         bundlePath: joinPath(tmpDir, 'test.zip'),
         appModules: [{uuid: '123', config: '{}', context: '', handle: 'handle'}],
         developerPlatformClient,
@@ -340,8 +335,9 @@ describe('uploadExtensionsBundle', () => {
       })
 
       // Then
-      expect(deploySpy).toHaveBeenCalledWith({
+      expect(developerPlatformClient.deploy).toHaveBeenCalledWith({
         apiKey: 'app-id',
+        organizationId: '1',
         bundleUrl: 'signed-upload-url',
         appModules: [
           {
@@ -362,13 +358,12 @@ describe('uploadExtensionsBundle', () => {
       const mockedFormData = {append: vi.fn(), getHeaders: vi.fn()}
       vi.mocked<any>(formData).mockReturnValue(mockedFormData)
       const developerPlatformClient = testDeveloperPlatformClient()
-      const {deploy} = developerPlatformClient
-      const deploySpy = vi.spyOn(developerPlatformClient, 'deploy').mockImplementation(deploy)
 
       // When
       await writeFile(joinPath(tmpDir, 'test.zip'), '')
       await uploadExtensionsBundle({
         apiKey: 'app-id',
+        organizationId: '1',
         bundlePath: joinPath(tmpDir, 'test.zip'),
         appModules: [{uuid: '123', config: '{}', context: '', handle: 'handle'}],
         developerPlatformClient,
@@ -379,8 +374,9 @@ describe('uploadExtensionsBundle', () => {
       })
 
       // Then
-      expect(deploySpy).toHaveBeenCalledWith({
+      expect(developerPlatformClient.deploy).toHaveBeenCalledWith({
         apiKey: 'app-id',
+        organizationId: '1',
         bundleUrl: 'signed-upload-url',
         appModules: [
           {
@@ -399,13 +395,12 @@ describe('uploadExtensionsBundle', () => {
 
   test('calls a mutation on partners when there are no extensions', async () => {
     const developerPlatformClient = testDeveloperPlatformClient()
-    const {deploy} = developerPlatformClient
-    const deploySpy = vi.spyOn(developerPlatformClient, 'deploy').mockImplementation(deploy)
     const mockedFormData = {append: vi.fn(), getHeaders: vi.fn()}
     vi.mocked<any>(formData).mockReturnValue(mockedFormData)
     // When
     await uploadExtensionsBundle({
       apiKey: 'app-id',
+      organizationId: '1',
       bundlePath: undefined,
       appModules: [],
       developerPlatformClient,
@@ -414,8 +409,9 @@ describe('uploadExtensionsBundle', () => {
     })
 
     // Then
-    expect(deploySpy).toHaveBeenCalledWith({
+    expect(developerPlatformClient.deploy).toHaveBeenCalledWith({
       apiKey: 'app-id',
+      organizationId: '1',
       skipPublish: false,
       message: undefined,
       versionTag: undefined,
@@ -508,6 +504,7 @@ describe('uploadExtensionsBundle', () => {
       try {
         await uploadExtensionsBundle({
           apiKey: 'app-id',
+          organizationId: '1',
           bundlePath: joinPath(tmpDir, 'test.zip'),
           appModules: [
             {uuid: '123', config: '{}', context: '', handle: 'handle'},
@@ -607,6 +604,7 @@ describe('uploadExtensionsBundle', () => {
       // When
       const result = await uploadExtensionsBundle({
         apiKey: 'app-id',
+        organizationId: '1',
         bundlePath: joinPath(tmpDir, 'test.zip'),
         appModules: [
           {uuid: '123', config: '{}', context: '', handle: 'handle'},

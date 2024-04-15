@@ -7,7 +7,8 @@ import {IdentifiersExtensions} from '../../models/app/identifiers.js'
 import {getUIExtensionsToMigrate, migrateExtensionsToUIExtension} from '../dev/migrate-to-ui-extension.js'
 import {getFlowExtensionsToMigrate, migrateFlowExtensions} from '../dev/migrate-flow-extension.js'
 import {AppInterface} from '../../models/app/app.js'
-import {ensureAuthenticatedPartners} from '@shopify/cli-kit/node/session'
+import {DeveloperPlatformClient} from '../../utilities/developer-platform-client.js'
+import {getPaymentsExtensionsToMigrate, migrateAppModules} from '../dev/migrate-app-module.js'
 import {outputCompleted} from '@shopify/cli-kit/node/output'
 import {AbortSilentError} from '@shopify/cli-kit/node/error'
 
@@ -29,11 +30,21 @@ export async function ensureExtensionsIds(
 
   const uiExtensionsToMigrate = getUIExtensionsToMigrate(localExtensions, remoteExtensions, validIdentifiers)
   const flowExtensionsToMigrate = getFlowExtensionsToMigrate(localExtensions, dashboardOnlyExtensions, validIdentifiers)
+  const paymentsExtensionsToMigrate = getPaymentsExtensionsToMigrate(
+    localExtensions,
+    dashboardOnlyExtensions,
+    validIdentifiers,
+  )
 
   if (uiExtensionsToMigrate.length > 0) {
     const confirmedMigration = await extensionMigrationPrompt(uiExtensionsToMigrate)
     if (!confirmedMigration) throw new AbortSilentError()
-    remoteExtensions = await migrateExtensionsToUIExtension(uiExtensionsToMigrate, options.appId, remoteExtensions)
+    remoteExtensions = await migrateExtensionsToUIExtension(
+      uiExtensionsToMigrate,
+      options.appId,
+      remoteExtensions,
+      options.developerPlatformClient,
+    )
   }
 
   if (flowExtensionsToMigrate.length > 0) {
@@ -43,6 +54,20 @@ export async function ensureExtensionsIds(
       flowExtensionsToMigrate,
       options.appId,
       dashboardOnlyExtensions,
+      options.developerPlatformClient,
+    )
+    remoteExtensions = remoteExtensions.concat(newRemoteExtensions)
+  }
+
+  if (paymentsExtensionsToMigrate.length > 0) {
+    const confirmedMigration = await extensionMigrationPrompt(paymentsExtensionsToMigrate, false)
+    if (!confirmedMigration) throw new AbortSilentError()
+    const newRemoteExtensions = await migrateAppModules(
+      paymentsExtensionsToMigrate,
+      options.appId,
+      'payments_extension',
+      dashboardOnlyExtensions,
+      options.developerPlatformClient,
     )
     remoteExtensions = remoteExtensions.concat(newRemoteExtensions)
   }
@@ -62,13 +87,10 @@ export async function ensureExtensionsIds(
     }
   }
 
-  let onlyRemoteExtensions = matchExtensions.toManualMatch.remote ?? []
-
   if (matchExtensions.toManualMatch.local.length > 0) {
     const matchResult = await manualMatchIds(matchExtensions.toManualMatch, 'uuid')
     validMatches = {...validMatches, ...matchResult.identifiers}
     extensionsToCreate.push(...matchResult.toCreate)
-    onlyRemoteExtensions = matchResult.onlyRemote
   }
 
   return {
@@ -95,11 +117,12 @@ export async function deployConfirmed(
     options.app,
     options.appId,
     options.includeDraftExtensions,
+    options.developerPlatformClient,
   )
 
   const validMatchesById: {[key: string]: string} = {}
   if (extensionsToCreate.length > 0) {
-    const newIdentifiers = await createExtensions(extensionsToCreate, options.appId)
+    const newIdentifiers = await createExtensions(extensionsToCreate, options.appId, options.developerPlatformClient)
     for (const [localIdentifier, registration] of Object.entries(newIdentifiers)) {
       validMatches[localIdentifier] = registration.uuid
       validMatchesById[localIdentifier] = registration.id
@@ -124,6 +147,7 @@ async function ensureNonUuidManagedExtensionsIds(
   app: AppInterface,
   appId: string,
   includeDraftExtensions = false,
+  developerPlatformClient: DeveloperPlatformClient,
 ) {
   let localExtensionRegistrations = includeDraftExtensions ? app.draftableExtensions : app.allExtensions
 
@@ -132,7 +156,9 @@ async function ensureNonUuidManagedExtensionsIds(
   const validMatches: {[key: string]: string} = {}
   const validMatchesById: {[key: string]: string} = {}
   localExtensionRegistrations.forEach((local) => {
-    const possibleMatch = remoteConfigurationRegistrations.find((remote) => remote.type === local.graphQLType)
+    const possibleMatch = remoteConfigurationRegistrations.find((remote) => {
+      return remote.type === developerPlatformClient.toExtensionGraphQLType(local.graphQLType)
+    })
     if (possibleMatch) {
       validMatches[local.localIdentifier] = possibleMatch.uuid
       validMatchesById[local.localIdentifier] = possibleMatch.id
@@ -140,7 +166,7 @@ async function ensureNonUuidManagedExtensionsIds(
   })
 
   if (extensionsToCreate.length > 0) {
-    const newIdentifiers = await createExtensions(extensionsToCreate, appId, false)
+    const newIdentifiers = await createExtensions(extensionsToCreate, appId, developerPlatformClient, false)
     for (const [localIdentifier, registration] of Object.entries(newIdentifiers)) {
       validMatches[localIdentifier] = registration.uuid
       validMatchesById[localIdentifier] = registration.id
@@ -150,21 +176,38 @@ async function ensureNonUuidManagedExtensionsIds(
   return {extensionsNonUuidManaged: validMatches, extensionsIdsNonUuidManaged: validMatchesById}
 }
 
-async function createExtensions(extensions: LocalSource[], appId: string, output = true) {
-  const token = await ensureAuthenticatedPartners()
+async function createExtensions(
+  extensions: LocalSource[],
+  appId: string,
+  developerPlatformClient: DeveloperPlatformClient,
+  output = true,
+) {
   const result: {[localIdentifier: string]: RemoteSource} = {}
+  let counter = 0
   for (const extension of extensions) {
-    // Create one at a time to avoid API rate limiting issues.
-    // eslint-disable-next-line no-await-in-loop
-    const registration = await createExtension(
-      appId,
-      extension.graphQLType,
-      extension.handle,
-      token,
-      extension.contextValue,
-    )
-    if (output) outputCompleted(`Created extension ${extension.handle}.`)
-    result[extension.localIdentifier] = registration
+    counter++
+    if (developerPlatformClient.supportsAtomicDeployments) {
+      // Just pretend to create the extension, as it's not necessary to do anything
+      // in this case.
+      result[extension.localIdentifier] = {
+        id: `${extension.localIdentifier}-${counter}`,
+        uuid: `${extension.localIdentifier}-${counter}`,
+        type: extension.type,
+        title: extension.handle,
+      }
+    } else {
+      // Create one at a time to avoid API rate limiting issues.
+      // eslint-disable-next-line no-await-in-loop
+      const registration = await createExtension(
+        appId,
+        extension.graphQLType,
+        extension.handle,
+        developerPlatformClient,
+        extension.contextValue,
+      )
+      if (output) outputCompleted(`Created extension ${extension.handle}.`)
+      result[extension.localIdentifier] = registration
+    }
   }
   return result
 }
